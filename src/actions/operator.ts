@@ -39,7 +39,13 @@ export abstract class BaseOperator extends BaseAction {
     if (!this.modes.includes(vimState.currentMode)) {
       return false;
     }
-    if (!BaseAction.CompareKeypressSequence(this.keys, keysPressed)) {
+    if (
+      !BaseAction.CompareKeypressSequence(
+        this.keys,
+        keysPressed,
+        vimState.isCurrentlyPerformingNonRecursiveRemapping
+      )
+    ) {
       return false;
     }
     if (
@@ -59,7 +65,13 @@ export abstract class BaseOperator extends BaseAction {
     if (!this.modes.includes(vimState.currentMode)) {
       return false;
     }
-    if (!BaseAction.CompareKeypressSequence(this.keys.slice(0, keysPressed.length), keysPressed)) {
+    if (
+      !BaseAction.CompareKeypressSequence(
+        this.keys.slice(0, keysPressed.length),
+        keysPressed,
+        vimState.isCurrentlyPerformingNonRecursiveRemapping
+      )
+    ) {
       return false;
     }
     if (
@@ -87,7 +99,11 @@ export abstract class BaseOperator extends BaseAction {
       // The previous action is the same as the one we're testing
       prevAction.constructor === this.constructor &&
       // The key pressed is the same as the previous action's last key.
-      BaseAction.CompareKeypressSequence(prevAction.keysPressed.slice(-1), keysPressed)
+      BaseAction.CompareKeypressSequence(
+        prevAction.keysPressed.slice(-1),
+        keysPressed,
+        vimState.isCurrentlyPerformingNonRecursiveRemapping
+      )
     );
   }
 

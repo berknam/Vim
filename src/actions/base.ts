@@ -59,9 +59,10 @@ export abstract class BaseAction {
       return false;
     }
 
+    const noRemap = vimState.isCurrentlyPerformingNonRecursiveRemapping;
     return (
       this.modes.includes(vimState.currentMode) &&
-      BaseAction.CompareKeypressSequence(this.keys, keysPressed)
+      BaseAction.CompareKeypressSequence(this.keys, keysPressed, noRemap)
     );
   }
 
@@ -75,7 +76,8 @@ export abstract class BaseAction {
 
     const keys2D = BaseAction.is2DArray(this.keys) ? this.keys : [this.keys];
     const keysSlice = keys2D.map((x) => x.slice(0, keysPressed.length));
-    if (!BaseAction.CompareKeypressSequence(keysSlice, keysPressed)) {
+    const noRemap = vimState.isCurrentlyPerformingNonRecursiveRemapping;
+    if (!BaseAction.CompareKeypressSequence(keysSlice, keysPressed, noRemap)) {
       return false;
     }
 
@@ -90,10 +92,14 @@ export abstract class BaseAction {
     return true;
   }
 
-  public static CompareKeypressSequence(one: string[] | string[][], two: string[]): boolean {
+  public static CompareKeypressSequence(
+    one: string[] | string[][],
+    two: string[],
+    noRemap: boolean
+  ): boolean {
     if (BaseAction.is2DArray(one)) {
       for (const sequence of one) {
-        if (BaseAction.CompareKeypressSequence(sequence, two)) {
+        if (BaseAction.CompareKeypressSequence(sequence, two, noRemap)) {
           return true;
         }
       }
@@ -134,10 +140,14 @@ export abstract class BaseAction {
         continue;
       }
 
-      if (left === '<leader>' && right === configuration.leader) {
+      if (left === '<leader>' && right === configuration.leader && !noRemap) {
         continue;
       }
       if (right === '<leader>' && left === configuration.leader) {
+        continue;
+      }
+
+      if (left === configuration.leader && right === configuration.leader && noRemap) {
         continue;
       }
 

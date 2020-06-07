@@ -55,7 +55,8 @@ suite('base action', () => {
       if (testCases.hasOwnProperty(test)) {
         const [left, right, expected] = testCases[test];
 
-        const actual = BaseAction.CompareKeypressSequence(left, right);
+        const noRemap = vimState.isCurrentlyPerformingNonRecursiveRemapping;
+        const actual = BaseAction.CompareKeypressSequence(left, right, noRemap);
         assert.strictEqual(actual, expected, `${left}. ${right}.`);
       }
     }
