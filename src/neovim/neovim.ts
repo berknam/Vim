@@ -11,6 +11,8 @@ import { exists } from 'fs';
 import { spawn, ChildProcess } from 'child_process';
 import { attach } from 'neovim/lib/attach';
 import { Neovim } from 'neovim/lib/api/Neovim';
+import { Range } from '../common/motion/range';
+import { Mode } from '../mode/mode';
 
 export class NeovimWrapper implements vscode.Disposable {
   private process: ChildProcess;
@@ -81,6 +83,34 @@ export class NeovimWrapper implements vscode.Disposable {
 
     // Sync buffer back to VSCode
     await this.syncVimToVSCode(vimState);
+    if (
+      vimState.currentMode.toString().toLocaleLowerCase().substr(0, 1) !==
+      mode.mode.toLocaleLowerCase()
+    ) {
+      const m = () => {
+        switch (mode.mode) {
+          case 'v':
+            return Mode.Visual;
+          case 'V':
+            return Mode.VisualLine;
+          case '':
+            return Mode.VisualBlock;
+          case 'n':
+            return Mode.Normal;
+          case 'no':
+            return Mode.OperatorPendingMode;
+          case 'i':
+            return Mode.Insert;
+          case 'R':
+            return Mode.Replace;
+          case 'c':
+            return Mode.CommandlineInProgress;
+          default:
+            return vimState.currentMode;
+        }
+      };
+      await vimState.setCurrentMode(m());
+    }
 
     return { statusBarText, error };
   }
@@ -169,12 +199,21 @@ export class NeovimWrapper implements vscode.Disposable {
 
     this.logger.debug(`${lines.length} lines in nvim. ${lineCount} in editor.`);
 
+    let posDot = (await this.nvim.callFunction('getpos', ['.'])) as Array<number>;
+    let posv = (await this.nvim.callFunction('getpos', ['v'])) as Array<number>;
+    let [startRow, startCharacter] = ((await this.nvim.callFunction('getpos', ['v'])) as Array<
+      number
+    >).slice(1, 3);
     let [row, character] = ((await this.nvim.callFunction('getpos', ['.'])) as Array<number>).slice(
       1,
       3
     );
     vimState.editor.selection = new vscode.Selection(
-      new Position(row - 1, character),
+      new Position(startRow - 1, startCharacter),
+      new Position(row - 1, character)
+    );
+    vimState.cursors[0] = new Range(
+      new Position(startRow - 1, startCharacter),
       new Position(row - 1, character)
     );
 

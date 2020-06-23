@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 import { RegisterAction, BaseCommand } from '../base';
 import { CommandShowCommandHistory, CommandShowSearchHistory } from './actions';
-import { Mode } from '../../mode/mode';
+import { Mode, isStatusBarMode } from '../../mode/mode';
 import { VimState } from '../../state/vimState';
 import { commandLine } from '../../cmd_line/commandLine';
 import { globalState } from '../../state/globalState';
@@ -142,7 +142,9 @@ class CommandEnterInCommandline extends BaseCommand {
 
   public async exec(position: Position, vimState: VimState): Promise<VimState> {
     await commandLine.Run(vimState.currentCommandlineText, vimState);
-    await vimState.setCurrentMode(Mode.Normal);
+    if (isStatusBarMode(vimState.currentMode)) {
+      await vimState.setCurrentMode(Mode.Normal);
+    }
     return vimState;
   }
 }
