@@ -110,6 +110,14 @@ abstract class BaseEasyMotionCommand extends BaseCommand {
       }
     }
   }
+
+  public doesActionApply(vimState: VimState, keysPressed: string[]) {
+    return configuration.easymotion && super.doesActionApply(vimState, keysPressed);
+  }
+
+  public couldActionApply(vimState: VimState, keysPressed: string[]) {
+    return configuration.easymotion && super.couldActionApply(vimState, keysPressed);
+  }
 }
 
 function getMatchesForString(
@@ -284,6 +292,14 @@ export class EasyMotionCharMoveCommandBase extends BaseCommand {
       await vimState.setCurrentMode(Mode.EasyMotionInputMode);
       return vimState;
     }
+  }
+
+  public doesActionApply(vimState: VimState, keysPressed: string[]) {
+    return configuration.easymotion && super.doesActionApply(vimState, keysPressed);
+  }
+
+  public couldActionApply(vimState: VimState, keysPressed: string[]) {
+    return configuration.easymotion && super.couldActionApply(vimState, keysPressed);
   }
 }
 
