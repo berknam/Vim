@@ -1072,7 +1072,7 @@ async function createSearchStateAndMoveToMatch(args: {
 
 @RegisterAction
 class CommandSearchCurrentWordExactForward extends BaseCommand {
-  modes = [Mode.Normal];
+  modes = [Mode.Normal, Mode.OperatorPendingMode];
   keys = ['*'];
   isMotion = true;
   runsOnceForEachCountPrefix = true;
@@ -1085,7 +1085,7 @@ class CommandSearchCurrentWordExactForward extends BaseCommand {
 
 @RegisterAction
 class CommandSearchCurrentWordForward extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine];
   keys = ['g', '*'];
   isMotion = true;
   runsOnceForEachCountPrefix = true;
@@ -1115,7 +1115,7 @@ class CommandSearchVisualForward extends BaseCommand {
 
 @RegisterAction
 class CommandSearchCurrentWordExactBackward extends BaseCommand {
-  modes = [Mode.Normal];
+  modes = [Mode.Normal, Mode.OperatorPendingMode];
   keys = ['#'];
   isMotion = true;
   runsOnceForEachCountPrefix = true;
@@ -1128,7 +1128,7 @@ class CommandSearchCurrentWordExactBackward extends BaseCommand {
 
 @RegisterAction
 class CommandSearchCurrentWordBackward extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine];
   keys = ['g', '#'];
   isMotion = true;
   runsOnceForEachCountPrefix = true;
@@ -1158,7 +1158,7 @@ class CommandSearchVisualBackward extends BaseCommand {
 
 @RegisterAction
 export class CommandSearchForwards extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = ['/'];
   isMotion = true;
   isJump = true;
@@ -1182,7 +1182,7 @@ export class CommandSearchForwards extends BaseCommand {
 
 @RegisterAction
 export class CommandSearchBackwards extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = ['?'];
   isMotion = true;
   isJump = true;
@@ -1321,18 +1321,12 @@ export class PutCommand extends BaseCommand {
     if (registerMode === RegisterMode.CharacterWise) {
       textToAdd = text;
       whereToAddText = dest;
-    } else if (
-      vimState.currentMode === Mode.Visual &&
-      registerMode === RegisterMode.LineWise
-    ) {
+    } else if (vimState.currentMode === Mode.Visual && registerMode === RegisterMode.LineWise) {
       // in the specific case of linewise register data during visual mode,
       // we need extra newline feeds
       textToAdd = '\n' + text + '\n';
       whereToAddText = dest;
-    } else if (
-      vimState.currentMode === Mode.VisualLine &&
-      registerMode === RegisterMode.LineWise
-    ) {
+    } else if (vimState.currentMode === Mode.VisualLine && registerMode === RegisterMode.LineWise) {
       // in the specific case of linewise register data during visual mode,
       // we need extra newline feeds
       const left = !noPrevLine && noNextLine ? '\n' : '';
@@ -1677,7 +1671,9 @@ export class PutCommandVisual extends BaseCommand {
     // The reason we need to handle Delete and Yank separately is because of
     // linewise mode. If we're in visualLine mode, then we want to copy
     // linewise but not necessarily delete linewise.
-    let putResult = await new PutCommand(this.multicursorIndex).exec(start, vimState, { after: true });
+    let putResult = await new PutCommand(this.multicursorIndex).exec(start, vimState, {
+      after: true,
+    });
     putResult.currentRegisterMode = isLineWise ? RegisterMode.LineWise : RegisterMode.CharacterWise;
     putResult.recordedState.registerName = configuration.useSystemClipboard ? '*' : '"';
     putResult = await new operator.YankOperator(this.multicursorIndex).run(putResult, start, end);
@@ -1753,7 +1749,10 @@ export class PutBeforeWithIndentCommand extends BaseCommand {
   modes = [Mode.Normal];
 
   public async exec(position: Position, vimState: VimState): Promise<VimState> {
-    const result = await new PutCommand().exec(position, vimState, { after: true, adjustIndent: true });
+    const result = await new PutCommand().exec(position, vimState, {
+      after: true,
+      adjustIndent: true,
+    });
 
     if (vimState.effectiveRegisterMode === RegisterMode.LineWise) {
       result.cursorStopPosition = TextEditor.getFirstNonWhitespaceCharOnLine(
@@ -1767,7 +1766,7 @@ export class PutBeforeWithIndentCommand extends BaseCommand {
 
 @RegisterAction
 class CommandShowCommandLine extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = [':'];
   runsOnceForEveryCursor() {
     return false;
@@ -2422,7 +2421,7 @@ async function selectLastSearchWord(
 
 @RegisterAction
 class CommandSelectNextLastSearchWord extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualBlock];
   keys = ['g', 'n'];
 
   public async exec(position: Position, vimState: VimState): Promise<VimState> {
@@ -2432,7 +2431,7 @@ class CommandSelectNextLastSearchWord extends BaseCommand {
 
 @RegisterAction
 class CommandSelectPreviousLastSearchWord extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualBlock];
   keys = ['g', 'N'];
 
   public async exec(position: Position, vimState: VimState): Promise<VimState> {
@@ -2590,7 +2589,7 @@ class CommandGoForwardInChangelist extends BaseCommand {
 
 @RegisterAction
 class CommandGoStartPrevOperatedText extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = [
     ['`', '['],
     ["'", '['],
@@ -2609,7 +2608,7 @@ class CommandGoStartPrevOperatedText extends BaseCommand {
 
 @RegisterAction
 class CommandGoEndPrevOperatedText extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = [
     ['`', ']'],
     ["'", ']'],
@@ -2628,7 +2627,7 @@ class CommandGoEndPrevOperatedText extends BaseCommand {
 
 @RegisterAction
 class CommandGoLastChange extends BaseCommand {
-  modes = [Mode.Normal];
+  modes = [Mode.Normal, Mode.OperatorPendingMode];
   keys = [
     ['`', '.'],
     ["'", '.'],
@@ -2826,7 +2825,7 @@ class CommandNavigateForward extends BaseCommand {
 
 @RegisterAction
 class CommandNavigateLast extends BaseCommand {
-  modes = [Mode.Normal];
+  modes = [Mode.Normal, Mode.OperatorPendingMode];
   keys = ['`', '`'];
   runsOnceForEveryCursor() {
     return false;
@@ -2840,7 +2839,7 @@ class CommandNavigateLast extends BaseCommand {
 
 @RegisterAction
 class CommandNavigateLastBOL extends BaseCommand {
-  modes = [Mode.Normal];
+  modes = [Mode.Normal, Mode.OperatorPendingMode];
   keys = ["'", "'"];
   runsOnceForEveryCursor() {
     return false;
