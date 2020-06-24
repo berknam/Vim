@@ -250,6 +250,7 @@ export class RecordedState {
    */
   public operatorCount: number = 0;
 
+  public executingNormal = false;
   /**
    * The register name for this action.
    */
@@ -276,6 +277,7 @@ export class RecordedState {
       !this.hasRunOperator &&
       mode !== Mode.SearchInProgressMode &&
       mode !== Mode.CommandlineInProgress &&
+      !this.executingNormal &&
       (this.hasRunAMovement ||
         isVisualMode(mode) ||
         (this.operators.length > 1 &&

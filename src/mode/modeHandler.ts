@@ -795,7 +795,7 @@ export class ModeHandler implements vscode.Disposable {
     // for VSCode to select including the last character we shift our stop position to the
     // right now that all steps that need that position have already run. On the next action
     // we will shift it back again on the start of 'runAction'.
-    if (vimState.currentMode === Mode.Visual) {
+    if (vimState.currentMode === Mode.Visual && !vimState.recordedState.executingNormal) {
       vimState.cursors = vimState.cursors.map((c) =>
         c.start.isBefore(c.stop)
           ? c.withNewStop(
@@ -805,7 +805,7 @@ export class ModeHandler implements vscode.Disposable {
       );
     }
 
-    if (ranAction) {
+    if (ranAction && !vimState.recordedState.executingNormal) {
       vimState.recordedState = new RecordedState();
 
       // Return to insert mode after 1 command in this case for <C-o>

@@ -14,6 +14,7 @@ import * as os from 'os';
 import { VimrcImpl } from '../src/configuration/vimrc';
 import { vimrcKeyRemappingBuilder } from '../src/configuration/vimrcKeyRemappingBuilder';
 import { IConfiguration } from '../src/configuration/iconfiguration';
+import { tokenizeKeySequence } from '../src/util/specialKeys';
 
 export function getTestingFunctions() {
   function getNiceStack(stack: string | undefined): string {
@@ -356,53 +357,6 @@ class TestWithRemapsObjectHelper {
 
     return ret.split('');
   }
-}
-
-/**
- * Tokenize a string like "abc<Esc>d<C-c>" into ["a", "b", "c", "<Esc>", "d", "<C-c>"]
- */
-function tokenizeKeySequence(sequence: string): string[] {
-  let isBracketedKey = false;
-  let key = '';
-  const result: string[] = [];
-
-  // no close bracket, probably trying to do a left shift, take literal
-  // char sequence
-  function rawTokenize(characters: string): void {
-    for (const char of characters) {
-      result.push(char);
-    }
-  }
-
-  for (const char of sequence) {
-    key += char;
-
-    if (char === '<') {
-      if (isBracketedKey) {
-        rawTokenize(key.slice(0, key.length - 1));
-        key = '<';
-      } else {
-        isBracketedKey = true;
-      }
-    }
-
-    if (char === '>') {
-      isBracketedKey = false;
-    }
-
-    if (isBracketedKey) {
-      continue;
-    }
-
-    result.push(key);
-    key = '';
-  }
-
-  if (isBracketedKey) {
-    rawTokenize(key);
-  }
-
-  return result;
 }
 
 async function testIt(modeHandler: ModeHandler, testObj: ITestObject): Promise<void> {

@@ -27,6 +27,7 @@ import { ClearJumpsCommand, JumpsCommand } from './commands/jumps';
 import { VimState } from '../state/vimState';
 import { StatusBar } from '../statusBar';
 import { ShCommand } from './commands/sh';
+import { parseNormalCommandArgs } from './subparsers/normal';
 
 // Associates a name and an abbreviation with a command parser
 export type CommandParserMapping = {
@@ -155,7 +156,7 @@ export const commandParsers = {
 
   normal: {
     abbrev: 'norm',
-    parser: undefined,
+    parser: parseNormalCommandArgs,
   },
 
   only: {

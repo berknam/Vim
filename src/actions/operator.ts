@@ -231,10 +231,10 @@ export class DeleteOperator extends BaseOperator {
       yank
     );
 
-    await vimState.setCurrentMode(Mode.Normal);
     if (vimState.currentMode === Mode.Visual) {
       vimState.desiredColumn = newPos.character;
     }
+    await vimState.setCurrentMode(Mode.Normal);
 
     const numLinesDeleted = Math.abs(start.line - end.line) + 1;
     reportLinesChanged(-numLinesDeleted, vimState);
