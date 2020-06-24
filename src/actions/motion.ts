@@ -39,7 +39,7 @@ export abstract class ExpandingSelection extends BaseMovement {
 }
 
 abstract class MoveByScreenLine extends BaseMovement {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine];
   movementType: CursorMovePosition;
   by: CursorMoveByUnit;
   value: number = 1;
@@ -55,12 +55,13 @@ abstract class MoveByScreenLine extends BaseMovement {
   ): Promise<Position | IMovement> {
     await vscode.commands.executeCommand('cursorMove', {
       to: this.movementType,
-      select: vimState.currentMode !== Mode.Normal,
+      select: vimState.currentMode !== Mode.Normal, // TODO: check if OperatorPendingMode needs this??
       by: this.by,
       value: this.value * count,
     });
 
     if (vimState.currentMode === Mode.Normal) {
+      // TODO: when implementing full OperatorPendingMode check if this needs to change??
       return Position.FromVSCodePosition(vimState.editor.selection.active);
     } else {
       /**
@@ -118,6 +119,7 @@ abstract class MoveByScreenLineMaintainDesiredColumn extends MoveByScreenLine {
     let prevLine = vimState.editor.selection.active.line;
 
     if (vimState.currentMode !== Mode.Normal) {
+      // TODO: when implementing full OperatorPendingMode check if this needs to change??
       /**
        * As VIM and VSCode handle the end of selection index a little
        * differently we need to sometimes move the cursor at the end
@@ -139,12 +141,13 @@ abstract class MoveByScreenLineMaintainDesiredColumn extends MoveByScreenLine {
 
     await vscode.commands.executeCommand('cursorMove', {
       to: this.movementType,
-      select: vimState.currentMode !== Mode.Normal,
+      select: vimState.currentMode !== Mode.Normal, // TODO: when implementing full OperatorPendingMode check if this needs to change??
       by: this.by,
       value: this.value,
     });
 
     if (vimState.currentMode === Mode.Normal) {
+      // TODO: when implementing full OperatorPendingMode check if this needs to change??
       let returnedPos = Position.FromVSCodePosition(vimState.editor.selection.active);
       if (prevLine !== returnedPos.line) {
         returnedPos = returnedPos.withColumn(prevDesiredColumn);
@@ -511,23 +514,11 @@ export class MoveLeft extends BaseMovement {
 
 @RegisterAction
 class MoveLeftArrow extends MoveLeft {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = ['<left>'];
 }
 
 @RegisterAction
-class BackSpaceInNormalMode extends BaseMovement {
-  modes = [Mode.Normal];
-  keys = ['<BS>'];
-
-  public async execAction(position: Position, vimState: VimState): Promise<Position> {
-    return position.getLeftThroughLineBreaks();
-  }
-}
-
-@RegisterAction
-class BackSpaceInVisualMode extends BaseMovement {
-  modes = [Mode.Visual, Mode.VisualBlock];
+class BackSpaceMovement extends BaseMovement {
   keys = ['<BS>'];
 
   public async execAction(position: Position, vimState: VimState): Promise<Position> {
@@ -552,7 +543,6 @@ class MoveRight extends BaseMovement {
 
 @RegisterAction
 class MoveRightArrow extends MoveRight {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = ['<right>'];
 }
 
@@ -917,7 +907,7 @@ class MoveScreenLineCenter extends MoveByScreenLine {
 
 @RegisterAction
 export class MoveUpByDisplayLine extends MoveByScreenLine {
-  modes = [Mode.Insert, Mode.Normal, Mode.Visual];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualBlock];
   keys = [
     ['g', 'k'],
     ['g', '<up>'],
@@ -929,7 +919,7 @@ export class MoveUpByDisplayLine extends MoveByScreenLine {
 
 @RegisterAction
 class MoveDownByDisplayLine extends MoveByScreenLine {
-  modes = [Mode.Insert, Mode.Normal, Mode.Visual];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualBlock];
   keys = [
     ['g', 'j'],
     ['g', '<down>'],
@@ -1012,7 +1002,6 @@ class MoveDownByScreenLineVisualBlock extends BaseMovement {
 
 @RegisterAction
 class MoveScreenToRight extends MoveByScreenLine {
-  modes = [Mode.Insert, Mode.Normal, Mode.Visual, Mode.VisualLine];
   keys = ['z', 'h'];
   movementType: CursorMovePosition = 'right';
   by: CursorMoveByUnit = 'character';
@@ -1028,7 +1017,6 @@ class MoveScreenToRight extends MoveByScreenLine {
 
 @RegisterAction
 class MoveScreenToLeft extends MoveByScreenLine {
-  modes = [Mode.Insert, Mode.Normal, Mode.Visual, Mode.VisualLine];
   keys = ['z', 'l'];
   movementType: CursorMovePosition = 'left';
   by: CursorMoveByUnit = 'character';
@@ -1044,7 +1032,6 @@ class MoveScreenToLeft extends MoveByScreenLine {
 
 @RegisterAction
 class MoveScreenToRightHalf extends MoveByScreenLine {
-  modes = [Mode.Insert, Mode.Normal, Mode.Visual, Mode.VisualLine];
   keys = ['z', 'H'];
   movementType: CursorMovePosition = 'right';
   by: CursorMoveByUnit = 'halfLine';
@@ -1060,7 +1047,6 @@ class MoveScreenToRightHalf extends MoveByScreenLine {
 
 @RegisterAction
 class MoveScreenToLeftHalf extends MoveByScreenLine {
-  modes = [Mode.Insert, Mode.Normal, Mode.Visual, Mode.VisualLine];
   keys = ['z', 'L'];
   movementType: CursorMovePosition = 'left';
   by: CursorMoveByUnit = 'halfLine';
@@ -1367,6 +1353,7 @@ class MoveParagraphEnd extends BaseMovement {
        */
       this.iteration++;
 
+      // TODO: when implementing full OperatorPendingMode check if this needs to change??
       const isLineWise = position.isLineBeginning() && vimState.currentMode === Mode.Normal;
 
       const isLastIteration = vimState.recordedState.count
@@ -1409,7 +1396,7 @@ class MoveParagraphBegin extends BaseMovement {
 }
 
 abstract class MoveSectionBoundary extends BaseMovement {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine];
   boundary: string;
   forward: boolean;
   isJump = true;
@@ -1554,7 +1541,6 @@ class MoveToMatchingBracket extends BaseMovement {
 }
 
 export abstract class MoveInsideCharacter extends ExpandingSelection {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   protected charToMatch: string;
   protected includeSurrounding = false;
   isJump = true;
@@ -1765,7 +1751,6 @@ class MoveAClosingSquareBracket extends MoveInsideCharacter {
 }
 
 export abstract class MoveQuoteMatch extends BaseMovement {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualBlock];
   protected charToMatch: string;
   protected includeSurrounding = false;
   isJump = true;
@@ -1952,7 +1937,6 @@ class MoveToUnclosedCurlyBracketForward extends MoveToMatchingBracket {
 }
 
 abstract class MoveTagMatch extends ExpandingSelection {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualBlock];
   protected includeTag = false;
   isJump = true;
 
