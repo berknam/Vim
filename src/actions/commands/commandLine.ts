@@ -216,6 +216,8 @@ class CommandInsertInCommandline extends BaseCommand {
     ['<Home>'],
     ['<End>'],
     ['<Del>'],
+    ['<BS>'],
+    ['<SHIFT+BS>'],
   ];
   runsOnceForEveryCursor() {
     return this.keysPressed[0] === '\n';
@@ -314,6 +316,8 @@ class CommandInsertInSearchMode extends BaseCommand {
     ['<Home>'],
     ['<End>'],
     ['<Del>'],
+    ['<BS>'],
+    ['<SHIFT+BS>'],
   ];
   isJump = true;
 

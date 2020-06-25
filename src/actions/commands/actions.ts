@@ -840,7 +840,7 @@ class CommandReplaceAtCursorFromInsertMode extends BaseCommand {
 @RegisterAction
 class CommandReplaceInReplaceMode extends BaseCommand {
   modes = [Mode.Replace];
-  keys = ['<character>'];
+  keys = [['<character>'], ['<BS>']];
   canBeRepeatedWithDot = true;
 
   public async exec(position: Position, vimState: VimState): Promise<VimState> {
@@ -3412,7 +3412,10 @@ class ActionJoinNoWhitespaceVisualMode extends BaseCommand {
 @RegisterAction
 class ActionReplaceCharacter extends BaseCommand {
   modes = [Mode.Normal];
-  keys = ['r', '<character>'];
+  keys = [
+    ['r', '<character>'],
+    ['r', '<TAB>'],
+  ];
   canBeRepeatedWithDot = true;
   runsOnceForEachCountPrefix = false;
 
@@ -3421,6 +3424,7 @@ class ActionReplaceCharacter extends BaseCommand {
     const toReplace = this.keysPressed[1];
 
     /**
+     * TODO: Update this comment
      * <character> includes <BS>, <SHIFT+BS> and <TAB> but not any control keys,
      * so we ignore the former two keys and have a special handle for <tab>.
      */
@@ -3487,7 +3491,10 @@ class ActionReplaceCharacter extends BaseCommand {
 @RegisterAction
 class ActionReplaceCharacterVisual extends BaseCommand {
   modes = [Mode.Visual, Mode.VisualLine];
-  keys = ['r', '<character>'];
+  keys = [
+    ['r', '<character>'],
+    ['r', '<TAB>'],
+  ];
   runsOnceForEveryCursor() {
     return false;
   }
@@ -3569,7 +3576,10 @@ class ActionReplaceCharacterVisual extends BaseCommand {
 @RegisterAction
 class ActionReplaceCharacterVisualBlock extends BaseCommand {
   modes = [Mode.VisualBlock];
-  keys = ['r', '<character>'];
+  keys = [
+    ['r', '<character>'],
+    ['r', '<TAB>'],
+  ];
   runsOnceForEveryCursor() {
     return false;
   }

@@ -21,7 +21,7 @@ import {
   MoveInsideTag,
   MoveQuoteMatch,
 } from '../motion';
-import { ChangeOperator, DeleteOperator, YankOperator } from './../operator';
+import { ChangeOperator, DeleteOperator, YankOperator, BaseOperator } from './../operator';
 import {
   SelectInnerBigWord,
   SelectInnerParagraph,
@@ -196,16 +196,66 @@ class CommandSurroundModeStart extends BaseCommand {
     return vimState;
   }
 
+  private hasValidOperatorBefore(operator: BaseOperator | undefined) {
+    return operator
+      ? operator instanceof DeleteOperator || operator instanceof ChangeOperator
+      : false;
+  }
+
   public doesActionApply(vimState: VimState, keysPressed: string[]): boolean {
     const hasSomeOperator = !!vimState.recordedState.operator;
 
-    return super.doesActionApply(vimState, keysPressed) && hasSomeOperator;
+    return (
+      super.doesActionApply(vimState, keysPressed) &&
+      this.hasValidOperatorBefore(vimState.recordedState.operator)
+    );
   }
 
   public couldActionApply(vimState: VimState, keysPressed: string[]): boolean {
     const hasSomeOperator = !!vimState.recordedState.operator;
 
-    return super.doesActionApply(vimState, keysPressed) && hasSomeOperator;
+    return (
+      super.doesActionApply(vimState, keysPressed) &&
+      this.hasValidOperatorBefore(vimState.recordedState.operator)
+    );
+  }
+}
+
+@RegisterAction
+class SurroundModeStartOperator extends BaseOperator {
+  modes = [Mode.Normal];
+  keys = ['y', 's'];
+  isCompleteAction = false;
+  runsOnceForEveryCursor() {
+    return false;
+  }
+
+  public async run(vimState: VimState, start: Position, end: Position): Promise<VimState> {
+    // Only execute the action if the configuration is set
+    if (!configuration.surround) {
+      return vimState;
+    }
+
+    // Start to record the keys to store for playback of surround using dot
+    vimState.recordedState.surroundKeys.push('y');
+    vimState.recordedState.surroundKeys.push('s');
+    vimState.recordedState.surroundKeyIndexStart =
+      vimState.keyHistory.length - vimState.recordedState.actionKeys.length;
+
+    vimState.surround = {
+      active: true,
+      target: undefined,
+      operator: 'yank',
+      replacement: undefined,
+      range: new Range(start, end),
+      previousMode: vimState.currentMode,
+    };
+
+    await vimState.setCurrentMode(Mode.SurroundInputMode);
+    vimState.cursorStopPosition = start;
+    vimState.cursorStartPosition = start;
+
+    return vimState;
   }
 }
 

@@ -185,11 +185,14 @@ export abstract class Actions {
 
     const possibleActionsForMode =
       Actions.actionMap.get(vimState.currentModeIncludingPseudoModes) || [];
+    let actionFound: BaseAction | undefined = undefined;
     for (const actionType of possibleActionsForMode) {
       const action = new actionType();
       if (action.doesActionApply(vimState, keysPressed)) {
         action.keysPressed = vimState.recordedState.actionKeys.slice(0);
-        return action;
+        // return action;
+        actionFound = action;
+        continue;
       }
 
       if (action.couldActionApply(vimState, keysPressed)) {
@@ -197,7 +200,12 @@ export abstract class Actions {
       }
     }
 
-    return isPotentialMatch ? KeypressState.WaitingOnKeys : KeypressState.NoPossibleMatch;
+    if (isPotentialMatch) {
+      vimState.recordedState.waitingForAnotherActionKey = actionFound ?? true;
+      return KeypressState.WaitingOnKeys;
+    } else {
+      return actionFound ?? KeypressState.NoPossibleMatch;
+    }
   }
 }
 

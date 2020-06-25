@@ -371,7 +371,7 @@ export class EasyMotionLineMoveCommandBase extends BaseEasyMotionCommand {
 @RegisterAction
 class EasyMotionCharInputMode extends BaseCommand {
   modes = [Mode.EasyMotionInputMode];
-  keys = ['<character>'];
+  keys = [['<character>'], ['<BS>'], ['<SHIFT+BS>']];
 
   public async exec(position: Position, vimState: VimState): Promise<VimState> {
     const key = this.keysPressed[0];

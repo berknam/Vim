@@ -27,6 +27,7 @@ import { clamp } from '../util/util';
  */
 
 export abstract class ExpandingSelection extends BaseMovement {
+  modes = [Mode.OperatorPendingMode, Mode.Visual, Mode.VisualBlock];
   protected selectionType = SelectionType.Expanding;
 
   protected adjustPosition(position: Position, result: IMovement, lastIteration: boolean) {
@@ -1730,6 +1731,7 @@ class MoveAClosingSquareBracket extends MoveInsideCharacter {
 }
 
 export abstract class MoveQuoteMatch extends BaseMovement {
+  modes = [Mode.OperatorPendingMode, Mode.Visual, Mode.VisualBlock];
   protected charToMatch: string;
   protected includeSurrounding = false;
   isJump = true;

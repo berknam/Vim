@@ -138,7 +138,7 @@ export class RecordedState {
    * it doesn't make much sense. The 'v' key puts you in Visual mode, it doesn't
    * accept any character argument.
    */
-  public waitingForAnotherActionKey: boolean = false;
+  public waitingForAnotherActionKey: BaseAction | boolean = false;
 
   /**
    * Every action that has been run.

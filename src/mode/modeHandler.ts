@@ -443,16 +443,23 @@ export class ModeHandler implements vscode.Disposable {
     let recordedState = vimState.recordedState;
     recordedState.actionKeys.push(key);
 
+    let remainingActionKey: string | undefined = undefined;
     let result = Actions.getRelevantAction(recordedState.actionKeys, vimState);
     switch (result) {
       case KeypressState.NoPossibleMatch:
+        if (vimState.recordedState.waitingForAnotherActionKey instanceof BaseAction) {
+          result = vimState.recordedState.waitingForAnotherActionKey;
+          remainingActionKey = recordedState.actionKeys.pop();
+          vimState.recordedState.waitingForAnotherActionKey = false;
+          break;
+        }
         vimState.recordedState = new RecordedState();
         // Since there is no possible action we are no longer waiting any action keys
         vimState.recordedState.waitingForAnotherActionKey = false;
 
         return vimState;
       case KeypressState.WaitingOnKeys:
-        vimState.recordedState.waitingForAnotherActionKey = true;
+        // vimState.recordedState.waitingForAnotherActionKey = true;
 
         return vimState;
     }
@@ -531,6 +538,10 @@ export class ModeHandler implements vscode.Disposable {
         Jump.fromStateBefore(vimState),
         Jump.fromStateNow(vimState)
       );
+    }
+
+    if (remainingActionKey) {
+      vimState = await this.handleKeyAsAnAction(remainingActionKey, vimState);
     }
 
     return vimState;

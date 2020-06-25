@@ -263,14 +263,14 @@ export class YankOperator extends BaseOperator {
   public async run(vimState: VimState, start: Position, end: Position): Promise<VimState> {
     // Hack to make Surround with y (which takes a motion) work.
 
-    if (vimState.surround) {
-      vimState.surround.range = new Range(start, end);
-      await vimState.setCurrentMode(Mode.SurroundInputMode);
-      vimState.cursorStopPosition = start;
-      vimState.cursorStartPosition = start;
+    // if (vimState.surround) {
+    //   vimState.surround.range = new Range(start, end);
+    //   await vimState.setCurrentMode(Mode.SurroundInputMode);
+    //   vimState.cursorStopPosition = start;
+    //   vimState.cursorStartPosition = start;
 
-      return vimState;
-    }
+    //   return vimState;
+    // }
 
     const originalMode = vimState.currentMode;
 
