@@ -386,12 +386,14 @@ export class ModeHandler implements vscode.Disposable {
       let lastAction = recordedState.actionsRun[recordedState.actionsRun.length - 1];
 
       if (lastAction instanceof DocumentContentChangeAction) {
-        lastAction.keysPressed.push(key);
-
         if (
           action instanceof CommandInsertInInsertMode ||
           action instanceof CommandInsertPreviousText
         ) {
+          if (action instanceof CommandInsertInInsertMode) {
+            // store the pressed key in lastAction
+            lastAction.keysPressed.push(key);
+          }
           // delay the macro recording
           actionToRecord = undefined;
         } else {
@@ -408,7 +410,10 @@ export class ModeHandler implements vscode.Disposable {
           // This means we are already in Insert Mode but there is still not DocumentContentChangeAction in stack
           vimState.historyTracker.currentContentChanges = [];
           let newContentChange = new DocumentContentChangeAction();
-          newContentChange.keysPressed.push(key);
+          if (action instanceof CommandInsertInInsertMode) {
+            // store the pressed key in contentChange action
+            newContentChange.keysPressed.push(key);
+          }
           recordedState.actionsRun.push(newContentChange);
           actionToRecord = newContentChange;
         } else {
@@ -981,16 +986,22 @@ export class ModeHandler implements vscode.Disposable {
           vimState.isReplayingMacro = true;
 
           if (transformation.register === ':') {
-            await commandLine.Run(recordedMacro.commandString, vimState);
+            const command = recordedMacro.commandString.replace(/<leader>/gi, configuration.leader);
+            if (transformation.replay === 'keystrokes') {
+              this.vimState.recordedState = new RecordedState();
+              await this.handleKeyEvent(command);
+            } else {
+              await commandLine.Run(command, vimState);
+            }
           } else if (transformation.replay === 'contentChange') {
             vimState = await this.runMacro(vimState, recordedMacro);
           } else {
-            let keyStrokes: string[] = [];
+            let keyStrokes: string = '';
             for (let action of recordedMacro.actionsRun) {
-              keyStrokes = keyStrokes.concat(action.keysPressed);
+              keyStrokes += action.keysPressed.join('');
             }
             this.vimState.recordedState = new RecordedState();
-            await this.handleMultipleKeyEvents(keyStrokes);
+            await this.handleKeyEvent(keyStrokes);
           }
 
           vimState.isReplayingMacro = false;

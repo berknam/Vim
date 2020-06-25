@@ -508,7 +508,7 @@ class CommandInsertRegisterContentInCommandLine extends BaseCommand {
     let text: string;
 
     if (register.text instanceof Array) {
-      text = (register.text as string[]).join('\n');
+      text = (register.text as string[]).join('');
     } else if (register.text instanceof RecordedState) {
       let keyStrokes: string[] = [];
 
@@ -516,13 +516,9 @@ class CommandInsertRegisterContentInCommandLine extends BaseCommand {
         keyStrokes = keyStrokes.concat(action.keysPressed);
       }
 
-      text = keyStrokes.join('\n');
+      text = keyStrokes.join('');
     } else {
       text = register.text;
-    }
-
-    if (register.registerMode === RegisterMode.LineWise) {
-      text += '\n';
     }
 
     vimState.currentCommandlineText += text;
@@ -543,7 +539,7 @@ class CommandInsertRegisterContentInSearchMode extends BaseCommand {
     let text: string;
 
     if (register.text instanceof Array) {
-      text = (register.text as string[]).join('\n');
+      text = (register.text as string[]).join('');
     } else if (register.text instanceof RecordedState) {
       let keyStrokes: string[] = [];
 
@@ -551,13 +547,9 @@ class CommandInsertRegisterContentInSearchMode extends BaseCommand {
         keyStrokes = keyStrokes.concat(action.keysPressed);
       }
 
-      text = keyStrokes.join('\n');
+      text = keyStrokes.join('');
     } else {
       text = register.text;
-    }
-
-    if (register.registerMode === RegisterMode.LineWise) {
-      text += '\n';
     }
 
     const searchState = globalState.searchState!;
