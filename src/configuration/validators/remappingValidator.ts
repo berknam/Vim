@@ -134,6 +134,8 @@ export class RemappingValidator implements IConfigurationValidator {
           return config.camelCaseMotion.enable;
         case 'easymotion':
           return config.easymotion;
+        case 'replacewithregister':
+          return config.replaceWithRegister;
         default:
           return false;
       }
