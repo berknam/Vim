@@ -122,7 +122,8 @@ async function StartSurroundMode(
   operatorString: 'change' | 'delete' | 'yank' | undefined = undefined,
   keys: string[],
   start: Position | undefined,
-  end: Position | undefined
+  end: Position | undefined,
+  registerMode: RegisterMode | undefined
 ): Promise<VimState> {
   // Only execute the action if the configuration is set
   if (!configuration.surround || !operatorString || keys.length === 0) {
@@ -151,6 +152,7 @@ async function StartSurroundMode(
     replacement: undefined,
     range: range,
     previousMode: vimState.currentMode,
+    forcedRegisterMode: registerMode,
   };
 
   if (operatorString === 'yank' && start) {
@@ -180,7 +182,14 @@ class BaseSurroundCommand extends BaseCommand {
     if (!this.operatorString || this.keys.length === 0) {
       return vimState;
     }
-    return StartSurroundMode(vimState, this.operatorString, this.keys, undefined, undefined);
+    return StartSurroundMode(
+      vimState,
+      this.operatorString,
+      this.keys,
+      undefined,
+      undefined,
+      undefined
+    );
   }
 
   public doesActionApply(vimState: VimState, keysPressed: string[]): boolean {
@@ -198,6 +207,25 @@ class CommandChangeSurround extends BaseSurroundCommand {
   pluginActionDefaultKeys = ['c', 's'];
   keys = ['<Plug>Csurround'];
   operatorString: 'change' | 'delete' | 'yank' | undefined = 'change';
+}
+
+@RegisterPluginAction('surround')
+class CommandChangeSurroundWithLineBreaks extends BaseSurroundCommand {
+  modes = [Mode.Normal];
+  pluginActionDefaultKeys = ['c', 'S'];
+  keys = ['<Plug>CSurround'];
+  operatorString: 'change' | 'delete' | 'yank' | undefined = 'change';
+
+  public async exec(position: Position, vimState: VimState): Promise<VimState> {
+    return StartSurroundMode(
+      vimState,
+      'change',
+      this.keys,
+      undefined,
+      undefined,
+      RegisterMode.LineWise
+    );
+  }
 }
 
 @RegisterPluginAction('surround')
@@ -220,7 +248,23 @@ class CommandSurroundModeStartVisual extends BaseSurroundCommand {
     if (vimState.currentMode === Mode.VisualLine) {
       [start, end] = [start.getLineBegin(), end.getLineEnd()];
     }
-    return StartSurroundMode(vimState, 'yank', this.keys, start, end);
+    return StartSurroundMode(vimState, 'yank', this.keys, start, end, undefined);
+  }
+}
+
+@RegisterPluginAction('surround')
+class CommandSurroundModeStartVisualWithLineBreaks extends BaseSurroundCommand {
+  modes = [Mode.Visual, Mode.VisualLine];
+  pluginActionDefaultKeys = ['g', 'S'];
+  keys = ['<Plug>VgSurround'];
+  operatorString: 'change' | 'delete' | 'yank' | undefined = 'yank';
+
+  public async exec(position: Position, vimState: VimState): Promise<VimState> {
+    let [start, end] = Position.sorted(vimState.cursorStartPosition, vimState.cursorStopPosition);
+    if (vimState.currentMode === Mode.VisualLine) {
+      [start, end] = [start.getLineBegin(), end.getLineEnd()];
+    }
+    return StartSurroundMode(vimState, 'yank', this.keys, start, end, RegisterMode.LineWise);
   }
 }
 
@@ -233,7 +277,23 @@ class CommandSurroundModeStartLine extends BaseSurroundCommand {
   public async exec(position: Position, vimState: VimState): Promise<VimState> {
     const start: Position = position.getLineBeginRespectingIndent();
     const end: Position = position.getLineEnd().getLastWordEnd().getRight();
-    return StartSurroundMode(vimState, 'yank', this.keys, start, end);
+    return StartSurroundMode(vimState, 'yank', this.keys, start, end, undefined);
+  }
+}
+
+@RegisterPluginAction('surround')
+class CommandSurroundModeStartLineWithLineBreaks extends BaseSurroundCommand {
+  modes = [Mode.Normal];
+  pluginActionDefaultKeys = [
+    ['y', 'S', 's'],
+    ['y', 'S', 'S'],
+  ];
+  keys = ['<Plug>YSsurround'];
+
+  public async exec(position: Position, vimState: VimState): Promise<VimState> {
+    const start: Position = position.getLineBeginRespectingIndent();
+    const end: Position = position.getLineEnd().getLastWordEnd().getRight();
+    return StartSurroundMode(vimState, 'yank', this.keys, start, end, RegisterMode.LineWise);
   }
 }
 
@@ -248,7 +308,7 @@ class SurroundModeStartOperator extends BaseOperator {
   }
 
   public async run(vimState: VimState, start: Position, end: Position): Promise<VimState> {
-    return StartSurroundMode(vimState, 'yank', this.keys, start, end);
+    return StartSurroundMode(vimState, 'yank', this.keys, start, end, undefined);
   }
 
   public doesActionApply(vimState: VimState, keysPressed: string[]): boolean {
@@ -257,6 +317,17 @@ class SurroundModeStartOperator extends BaseOperator {
 
   public couldActionApply(vimState: VimState, keysPressed: string[]): boolean {
     return configuration.surround && super.couldActionApply(vimState, keysPressed);
+  }
+}
+
+@RegisterPluginAction('surround')
+class SurroundModeStartOperatorWithLineBreaks extends SurroundModeStartOperator {
+  modes = [Mode.Normal];
+  pluginActionDefaultKeys = ['y', 'S'];
+  keys = ['<Plug>YSurround'];
+
+  public async run(vimState: VimState, start: Position, end: Position): Promise<VimState> {
+    return StartSurroundMode(vimState, 'yank', this.keys, start, end, RegisterMode.LineWise);
   }
 }
 
@@ -470,7 +541,10 @@ export class CommandSurroundAddToReplacement extends BaseCommand {
         stop = stop.getRight();
       }
 
-      if (vimState.surround.previousMode === Mode.VisualLine) {
+      if (
+        vimState.surround.previousMode === Mode.VisualLine ||
+        vimState.surround.forcedRegisterMode === RegisterMode.LineWise
+      ) {
         startReplace = startReplace + '\n';
         endReplace = '\n' + endReplace;
       }
@@ -516,6 +590,11 @@ export class CommandSurroundAddToReplacement extends BaseCommand {
 
       startReplaceRange = new Range(start, start.getRight());
       endReplaceRange = new Range(stop, stop.getRight());
+
+      if (vimState.surround?.forcedRegisterMode === RegisterMode.LineWise) {
+        startReplace = startReplace + '\n';
+        endReplace = '\n' + endReplace;
+      }
     }
 
     const pairedMatchings: {
@@ -548,6 +627,11 @@ export class CommandSurroundAddToReplacement extends BaseCommand {
       if (target === open) {
         CommandSurroundAddToReplacement.RemoveWhitespace(vimState, start, stop);
       }
+
+      if (vimState.surround?.forcedRegisterMode === RegisterMode.LineWise) {
+        startReplace = startReplace + '\n';
+        endReplace = '\n' + endReplace;
+      }
     }
 
     if (target === 't') {
@@ -579,6 +663,11 @@ export class CommandSurroundAddToReplacement extends BaseCommand {
       }
 
       endDeleteRange = new Range(innerTagContent.stop.getRight(), stop);
+
+      if (vimState.surround?.forcedRegisterMode === RegisterMode.LineWise) {
+        startReplace = startReplace + '\n';
+        endReplace = '\n' + endReplace;
+      }
     }
 
     if (operator === 'change') {
@@ -612,10 +701,15 @@ export class CommandSurroundAddToReplacement extends BaseCommand {
           return CommandSurroundAddToReplacement.Finish(vimState);
         }
 
-        if (addNewline === 'end-only' || addNewline === 'both') {
+        let isForcedLineWise = false;
+        if (vimState.surround?.forcedRegisterMode === RegisterMode.LineWise) {
+          isForcedLineWise = true;
+        }
+
+        if (addNewline === 'end-only' || addNewline === 'both' || isForcedLineWise) {
           endReplace = '\n' + endReplace;
         }
-        if (addNewline === 'both') {
+        if (addNewline === 'both' || isForcedLineWise) {
           startReplace += '\n';
         }
 
