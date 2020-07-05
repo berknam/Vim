@@ -387,12 +387,13 @@ export class ModeHandler implements vscode.Disposable {
       let lastAction = recordedState.actionsRun[recordedState.actionsRun.length - 1];
 
       if (lastAction instanceof DocumentContentChangeAction) {
-        lastAction.keysPressed.push(key);
-
         if (
-          action instanceof CommandInsertInInsertMode ||
-          action instanceof CommandInsertPreviousText
+          action instanceof CommandInsertInInsertMode // ||
+          // action instanceof CommandInsertPreviousText
         ) {
+          // if (action instanceof CommandInsertInInsertMode) {
+          lastAction.keysPressed.push(key);
+          // }
           // delay the macro recording
           actionToRecord = undefined;
         } else {

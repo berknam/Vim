@@ -117,7 +117,9 @@ export class CommandInsertPreviousText extends BaseCommand {
       throw error.VimError.fromCode(error.ErrorCode.NoInsertedTextYet);
     }
 
-    let actions = lastInserted.actionsRun.slice(0);
+    let actions = lastInserted.actionsRun
+      .slice(0)
+      .filter((a) => !(a instanceof CommandInsertPreviousText));
     // let actions = Register.lastContentChange.actionsRun.slice(0);
     // The first action is entering Insert Mode, which is not necessary in this case
     actions.shift();
@@ -136,6 +138,14 @@ export class CommandInsertPreviousText extends BaseCommand {
 
       if (action instanceof DocumentContentChangeAction) {
         vimState = await action.exec(vimState.cursorStopPosition, vimState);
+        // const previousAction =
+        //   vimState.recordedState.actionsRun[vimState.recordedState.actionsRun.length - 2];
+        // if (previousAction instanceof DocumentContentChangeAction) {
+        //   // Push document content change to the stack
+        //   previousAction.addChanges(vimState.historyTracker.currentContentChanges);
+        //   vimState.historyTracker.currentContentChanges = [];
+        // }
+        vimState.recordedState.actionsRun.push(action);
       }
     }
 
