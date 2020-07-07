@@ -278,6 +278,7 @@ class DisableExtension extends BaseCommand {
     Mode.EasyMotionMode,
     Mode.EasyMotionInputMode,
     Mode.SurroundInputMode,
+    Mode.OperatorPendingMode,
   ];
   keys = [SpecialKeys.ExtensionDisable];
 
@@ -300,7 +301,7 @@ class EnableExtension extends BaseCommand {
 
 @RegisterAction
 export class CommandNumber extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = ['<number>'];
   isCompleteAction = false;
   runsOnceForEveryCursor() {
@@ -538,6 +539,7 @@ class CommandEsc extends BaseCommand {
     Mode.SurroundInputMode,
     Mode.EasyMotionMode,
     Mode.EasyMotionInputMode,
+    Mode.OperatorPendingMode,
   ];
   keys = [['<Esc>'], ['<C-c>'], ['<C-[>']];
 
@@ -1089,7 +1091,7 @@ async function createSearchStateAndMoveToMatch(args: {
 
 @RegisterAction
 class CommandSearchCurrentWordExactForward extends BaseCommand {
-  modes = [Mode.Normal];
+  modes = [Mode.Normal, Mode.OperatorPendingMode];
   keys = ['*'];
   isMotion = true;
   runsOnceForEachCountPrefix = true;
@@ -1102,7 +1104,7 @@ class CommandSearchCurrentWordExactForward extends BaseCommand {
 
 @RegisterAction
 class CommandSearchCurrentWordForward extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine];
   keys = ['g', '*'];
   isMotion = true;
   runsOnceForEachCountPrefix = true;
@@ -1132,7 +1134,7 @@ class CommandSearchVisualForward extends BaseCommand {
 
 @RegisterAction
 class CommandSearchCurrentWordExactBackward extends BaseCommand {
-  modes = [Mode.Normal];
+  modes = [Mode.Normal, Mode.OperatorPendingMode];
   keys = ['#'];
   isMotion = true;
   runsOnceForEachCountPrefix = true;
@@ -1145,7 +1147,7 @@ class CommandSearchCurrentWordExactBackward extends BaseCommand {
 
 @RegisterAction
 class CommandSearchCurrentWordBackward extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine];
   keys = ['g', '#'];
   isMotion = true;
   runsOnceForEachCountPrefix = true;
@@ -1175,7 +1177,7 @@ class CommandSearchVisualBackward extends BaseCommand {
 
 @RegisterAction
 export class CommandSearchForwards extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = ['/'];
   isMotion = true;
   isJump = true;
@@ -1199,7 +1201,7 @@ export class CommandSearchForwards extends BaseCommand {
 
 @RegisterAction
 export class CommandSearchBackwards extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = ['?'];
   isMotion = true;
   isJump = true;
@@ -1783,7 +1785,7 @@ export class PutBeforeWithIndentCommand extends BaseCommand {
 
 @RegisterAction
 class CommandShowCommandLine extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = [':'];
   runsOnceForEveryCursor() {
     return false;
@@ -2438,7 +2440,7 @@ async function selectLastSearchWord(
 
 @RegisterAction
 class CommandSelectNextLastSearchWord extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualBlock];
   keys = ['g', 'n'];
 
   public async exec(position: Position, vimState: VimState): Promise<VimState> {
@@ -2448,7 +2450,7 @@ class CommandSelectNextLastSearchWord extends BaseCommand {
 
 @RegisterAction
 class CommandSelectPreviousLastSearchWord extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualBlock];
   keys = ['g', 'N'];
 
   public async exec(position: Position, vimState: VimState): Promise<VimState> {
@@ -2606,7 +2608,7 @@ class CommandGoForwardInChangelist extends BaseCommand {
 
 @RegisterAction
 class CommandGoStartPrevOperatedText extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = [
     ['`', '['],
     ["'", '['],
@@ -2625,7 +2627,7 @@ class CommandGoStartPrevOperatedText extends BaseCommand {
 
 @RegisterAction
 class CommandGoEndPrevOperatedText extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
   keys = [
     ['`', ']'],
     ["'", ']'],
@@ -2644,7 +2646,7 @@ class CommandGoEndPrevOperatedText extends BaseCommand {
 
 @RegisterAction
 class CommandGoLastChange extends BaseCommand {
-  modes = [Mode.Normal];
+  modes = [Mode.Normal, Mode.OperatorPendingMode];
   keys = [
     ['`', '.'],
     ["'", '.'],
@@ -2842,7 +2844,7 @@ class CommandNavigateForward extends BaseCommand {
 
 @RegisterAction
 class CommandNavigateLast extends BaseCommand {
-  modes = [Mode.Normal];
+  modes = [Mode.Normal, Mode.OperatorPendingMode];
   keys = ['`', '`'];
   runsOnceForEveryCursor() {
     return false;
@@ -2856,7 +2858,7 @@ class CommandNavigateLast extends BaseCommand {
 
 @RegisterAction
 class CommandNavigateLastBOL extends BaseCommand {
-  modes = [Mode.Normal];
+  modes = [Mode.Normal, Mode.OperatorPendingMode];
   keys = ["'", "'"];
   runsOnceForEveryCursor() {
     return false;

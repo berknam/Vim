@@ -27,7 +27,8 @@ export function buildTriggerKeys(trigger: EasymotionTrigger) {
 }
 
 abstract class BaseEasyMotionCommand extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  pluginActionDefaultKeys: string[] = [];
 
   private _baseOptions: EasyMotionMoveOptionsBase;
 
@@ -37,7 +38,7 @@ abstract class BaseEasyMotionCommand extends BaseCommand {
     super();
     this._baseOptions = baseOptions;
     if (trigger) {
-      this.keys = buildTriggerKeys(trigger);
+      this.pluginActionDefaultKeys = buildTriggerKeys(trigger);
     }
   }
 
@@ -109,6 +110,14 @@ abstract class BaseEasyMotionCommand extends BaseCommand {
         }
       }
     }
+  }
+
+  public doesActionApply(vimState: VimState, keysPressed: string[]) {
+    return configuration.easymotion && super.doesActionApply(vimState, keysPressed);
+  }
+
+  public couldActionApply(vimState: VimState, keysPressed: string[]) {
+    return configuration.easymotion && super.couldActionApply(vimState, keysPressed);
   }
 }
 
@@ -262,13 +271,14 @@ export class SearchByNCharCommand extends BaseEasyMotionCommand implements EasyM
 }
 
 export class EasyMotionCharMoveCommandBase extends BaseCommand {
-  modes = [Mode.Normal, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  modes = [Mode.Normal, Mode.OperatorPendingMode, Mode.Visual, Mode.VisualLine, Mode.VisualBlock];
+  pluginActionDefaultKeys: string[] = [];
   private _action: EasyMotionSearchAction;
 
   constructor(trigger: EasymotionTrigger, action: EasyMotionSearchAction) {
     super();
     this._action = action;
-    this.keys = buildTriggerKeys(trigger);
+    this.pluginActionDefaultKeys = buildTriggerKeys(trigger);
   }
 
   public async exec(position: Position, vimState: VimState): Promise<VimState> {
@@ -284,6 +294,14 @@ export class EasyMotionCharMoveCommandBase extends BaseCommand {
       await vimState.setCurrentMode(Mode.EasyMotionInputMode);
       return vimState;
     }
+  }
+
+  public doesActionApply(vimState: VimState, keysPressed: string[]) {
+    return configuration.easymotion && super.doesActionApply(vimState, keysPressed);
+  }
+
+  public couldActionApply(vimState: VimState, keysPressed: string[]) {
+    return configuration.easymotion && super.couldActionApply(vimState, keysPressed);
   }
 }
 
