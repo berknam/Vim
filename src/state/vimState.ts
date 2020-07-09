@@ -6,12 +6,13 @@ import { EditorIdentity } from './../editorIdentity';
 import { HistoryTracker } from './../history/historyTracker';
 import { InputMethodSwitcher } from '../actions/plugins/imswitcher';
 import { Logger } from '../util/logger';
-import { Mode } from '../mode/mode';
+import { Mode, isVisualMode } from '../mode/mode';
 import { Position } from './../common/motion/position';
 import { Range } from './../common/motion/range';
 import { RecordedState } from './recordedState';
 import { RegisterMode } from './../register/register';
 import { ReplaceState } from './../state/replaceState';
+import { TextEditor } from '../textEditor';
 
 interface INVim {
   run(vimState: VimState, command: string): Promise<{ statusBarText: string; error: boolean }>;
@@ -31,6 +32,7 @@ interface INVim {
 export class VimState implements vscode.Disposable {
   private readonly logger = Logger.get('VimState');
 
+  private _desiredColumn = 0;
   /**
    * The column the cursor wants to be at, or Number.POSITIVE_INFINITY if it should always
    * be the rightmost column.
@@ -40,7 +42,97 @@ export class VimState implements vscode.Disposable {
    * This is because if the third column is 25 characters, the cursor will go
    * back to the 20th column.
    */
-  public desiredColumn = 0;
+  public get desiredColumn(): number {
+    return this._desiredColumn;
+  }
+
+  public ignoreNextSelectionChange: boolean = false;
+
+  public async setDesiredColumn(value: number) {
+    // const currentCursorColumn = this.cursorStopPosition.character;
+    const currentCursorColumn = this.editor.selection.active.character;
+    const currentLine = this.editor.selection.active.line;
+    const currentSelections = this.editor.selections.slice(0);
+    this.ignoreNextSelectionChange = true;
+    await vscode.commands
+      .executeCommand('cursorMove', {
+        // to: 'up',
+        to: 'wrappedLineStart',
+        select: isVisualMode(this.currentMode),
+        // by: 'wrappedLine',
+        // value: 1,
+      })
+      .then(async () => {
+        let rightMoveToCorrectPosition: number = 0;
+        // const active = this.editor.selection.active;
+        // if (active.character > 0) {
+        //   // We were on a wrapped line so the left movement sent us to the end of the previous
+        //   // line instead of sending us to the start of line.
+        //   this._desiredColumn =
+        //     currentCursorColumn -
+        //     active.character +
+        //     TextEditor.getFirstNonWhitespaceCharOnLine(active.line).character;
+        //   await vscode.commands.executeCommand('cursorMove', {
+        //     to: 'right',
+        //     select: false,
+        //     by: 'character',
+        //     value: 1,
+        //   });
+        //   rightMoveToCorrectPosition = currentCursorColumn - active.character - 1;
+        // } else {
+        //   this._desiredColumn = value;
+        //   rightMoveToCorrectPosition = value;
+        // }
+        // await vscode.commands.executeCommand('cursorMove', {
+        //   to: 'right',
+        //   select: false,
+        //   by: 'character',
+        //   value: rightMoveToCorrectPosition,
+        // });
+        // if (this.editor.selection.active.line === currentLine) {
+        const active = this.editor.selection.active;
+        if (this.editor.selection.active.character !== 0) {
+          // Inside WrappedLine
+          // await vscode.commands.executeCommand('cursorMove', {
+          //   to: 'right',
+          //   select: isVisualMode(this.currentMode),
+          //   by: 'character',
+          //   value: value,
+          // });
+          // const active = this.editor.selection.active;
+          this._desiredColumn =
+            value -
+            active.character +
+            TextEditor.getFirstNonWhitespaceCharOnLine(active.line).character;
+          // this._desiredColumn =
+          //   currentCursorColumn -
+          //   active.character +
+          //   TextEditor.getFirstNonWhitespaceCharOnLine(active.line).character;
+          // await vscode.commands.executeCommand('cursorMove', {
+          //   to: 'left',
+          //   select: isVisualMode(this.currentMode),
+          //   by: 'character',
+          //   value: active.character - currentCursorColumn,
+          // });
+        } else {
+          this._desiredColumn = value;
+        }
+        // await vscode.commands.executeCommand('cursorMove', {
+        //   to: 'right',
+        //   select: isVisualMode(this.currentMode),
+        //   by: 'character',
+        //   value: currentCursorColumn - active.character,
+        // });
+        // await vscode.commands.executeCommand('cursorMove', {
+        //   to: 'down',
+        //   select: isVisualMode(this.currentMode),
+        //   by: 'wrappedLine',
+        //   value: 1,
+        // });
+        this.editor.selections = currentSelections;
+        this.ignoreNextSelectionChange = false;
+      });
+  }
 
   public historyTracker: HistoryTracker;
 
@@ -205,9 +297,11 @@ export class VimState implements vscode.Disposable {
     | undefined = undefined;
 
   /**
-   * Was the previous mouse click past EOL
+   * Is the current mouse click the first one of a new selection? This is true only when the
+   * selection is empty.
    */
-  public lastClickWasPastEol: boolean = false;
+  public isClickStartingANewSelection: boolean = false;
+  public currentSelectionFromMouse: boolean = false;
 
   /**
    * The mode Vim will be in once this action finishes.

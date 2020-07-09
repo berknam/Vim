@@ -43,6 +43,7 @@ import { Notation } from '../configuration/notation';
 import { ModeHandlerMap } from './modeHandlerMap';
 import { EditorIdentity } from '../editorIdentity';
 import { BaseOperator } from '../actions/operator';
+import { logger } from 'neovim/lib/utils/logger';
 
 /**
  * ModeHandler is the extension's backbone. It listens to events and updates the VimState.
@@ -89,14 +90,15 @@ export class ModeHandler implements vscode.Disposable {
    */
   public syncCursors() {
     // TODO: getCursorsAfterSync() is basically this, but stupider
-    setImmediate(() => {
+    setImmediate(async () => {
       if (this.vimState.editor) {
         const { selections } = this.vimState.editor;
         if (
           !this.vimState.cursorStartPosition.isEqual(selections[0].anchor) ||
           !this.vimState.cursorStopPosition.isEqual(selections[0].active)
         ) {
-          this.vimState.desiredColumn = selections[0].active.character;
+          // this.vimState.desiredColumn = selections[0].active.character;
+          await this.vimState.setDesiredColumn(selections[0].active.character);
         }
 
         this.vimState.cursors = selections.map(({ active, anchor }) =>
@@ -128,6 +130,7 @@ export class ModeHandler implements vscode.Disposable {
    */
   public async handleSelectionChange(e: vscode.TextEditorSelectionChangeEvent): Promise<void> {
     let selection = e.selections[0];
+    logger.debug(`Changed Selection: ${e.kind}`);
     if (
       (e.selections.length !== this.vimState.cursors.length || this.vimState.isMultiCursor) &&
       this.vimState.currentMode !== Mode.VisualBlock
@@ -152,6 +155,18 @@ export class ModeHandler implements vscode.Disposable {
      */
     if (e.kind !== vscode.TextEditorSelectionChangeKind.Mouse) {
       if (selection) {
+        if (e.kind === vscode.TextEditorSelectionChangeKind.Command) {
+          this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
+          this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
+          if (
+            !this.vimState.cursorStopPosition.isEqual(this.vimState.cursorStartPosition) &&
+            !isVisualMode(this.vimState.currentMode)
+          ) {
+            await this.setCurrentMode(Mode.Visual);
+          }
+          await this.updateView(this.vimState, { drawSelection: false, revealRange: false });
+          return;
+        }
         if (isVisualMode(this.vimState.currentMode)) {
           /**
            * In Visual Mode, our `cursorPosition` and `cursorStartPosition` can not reflect `active`,
@@ -161,8 +176,12 @@ export class ModeHandler implements vscode.Disposable {
           return;
         }
 
-        this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
-        this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.start);
+        if (!this.vimState.cursorStopPosition.isEqual(selection.active)) {
+          this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
+        }
+        if (!this.vimState.cursorStartPosition.isEqual(selection.anchor)) {
+          this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
+        }
       }
       return;
     }
@@ -177,68 +196,271 @@ export class ModeHandler implements vscode.Disposable {
 
     let toDraw = false;
 
+    const inSurroundingOfSelectionAnchor = (pos: Position) => {
+      // if (
+      //   pos.line === this.vimState.editor.selection.start.line &&
+      //   pos.character === this.vimState.editor.selection.start.character - 1
+      // ) {
+      //   return true;
+      // }
+
+      // if (pos.line === this.vimState.editor.selection.end.line && pos.character === this.vimState.editor.selection.end.character + 1) {
+      //   return true;
+      // }
+
+      // if (pos.line === this.vimState.editor.selection.start.line - 1) {
+      //   return true;
+      // }
+
+      // if (pos.line === this.vimState.editor.selection.end.line + 1) {
+      //   return true;
+      // }
+      if (
+        (Math.abs(pos.line - this.vimState.editor.selection.anchor.line) >= 1 &&
+          pos.character ===
+            Math.min(
+              pos.getLineEnd().character,
+              this.vimState.editor.selection.anchor.character
+            )) ||
+        (pos.line - this.vimState.editor.selection.anchor.line === 0 &&
+          Math.abs(pos.character - this.vimState.editor.selection.anchor.character) >= 1)
+      ) {
+        return true;
+      }
+
+      return false;
+    };
+
     if (selection) {
       let newPosition = Position.FromVSCodePosition(selection.active);
 
       // Only check on a click, not a full selection (to prevent clicking past EOL)
-      if (newPosition.character >= newPosition.getLineEnd().character && selection.isEmpty) {
+      if (
+        newPosition.character >= newPosition.getLineEnd().character &&
+        selection.isEmpty &&
+        !this.vimState.isClickStartingANewSelection
+      ) {
+        this.vimState.isClickStartingANewSelection = true;
         if (this.vimState.currentMode !== Mode.Insert) {
-          this.vimState.lastClickWasPastEol = true;
-
           // This prevents you from mouse clicking past the EOL
           newPosition = newPosition.withColumn(Math.max(newPosition.getLineEnd().character - 1, 0));
+          // newPosition = newPosition.withColumn(newPosition.getLineEnd().character);
 
-          // Switch back to normal mode since it was a click not a selection
-          await this.setCurrentMode(Mode.Normal);
+          // // Switch back to normal mode since it was a click not a selection
+          // await this.setCurrentMode(Mode.Normal);
 
           toDraw = true;
         }
-      } else if (selection.isEmpty) {
-        this.vimState.lastClickWasPastEol = false;
+      } else if (
+        selection.isEmpty &&
+        !this.vimState.isClickStartingANewSelection &&
+        !(
+          isVisualMode(this.vimState.currentMode) &&
+          // selection.anchor.line === this.vimState.cursorStopPosition.line &&
+          // selection.anchor.character === this.vimState.cursorStopPosition.character + 1 &&
+          // inSurroundingOfSelectionAnchor(this.vimState.cursorStopPosition) &&
+          ((this.vimState.cursorStopPosition.isAfter(this.vimState.cursorStartPosition) &&
+            selection.anchor.isEqual(this.vimState.cursorStartPosition)) ||
+            (this.vimState.cursorStopPosition.isBefore(this.vimState.cursorStartPosition) &&
+              selection.anchor.isEqual(this.vimState.cursorStartPosition.getRight())) ||
+            (this.vimState.cursorStopPosition.isEqual(this.vimState.cursorStartPosition) &&
+              selection.anchor.isEqual(this.vimState.cursorStartPosition)) ||
+            (this.vimState.cursorStopPosition.isEqual(this.vimState.cursorStartPosition) &&
+              selection.anchor.isEqual(this.vimState.cursorStartPosition.getRight())))
+        )
+      ) {
+        // It was a click but it was not past EOL
+        this.vimState.isClickStartingANewSelection = true;
       }
 
-      this.vimState.cursorStopPosition = newPosition;
-      this.vimState.cursorStartPosition = newPosition;
-      this.vimState.desiredColumn = newPosition.character;
+      // this.vimState.cursorStopPosition = newPosition;
+      // this.vimState.cursorStartPosition = newPosition;
+      // this.vimState.desiredColumn = newPosition.character;
+      // await this.vimState.setDesiredColumn(newPosition.character);
 
+      /**
+       * FIRST IF BRANCH
+       */
       // start visual mode?
       if (
         selection.anchor.line === selection.active.line &&
         selection.anchor.character >= newPosition.getLineEnd().character - 1 &&
-        selection.active.character >= newPosition.getLineEnd().character - 1
+        selection.active.character >= newPosition.getLineEnd().character - 1 &&
+        !selection.isEmpty // this makes sure it wasn't just a click
       ) {
-        // This prevents you from selecting EOL
-      } else if (!selection.anchor.isEqual(selection.active)) {
+        /** ~~This prevents you from selecting EOL~~ */
+        // Vim allows you to select EOL, it just includes the last character as well and
+        // we already made newPosition be at character on the block of code above right on
+        // the first click so all we need to do is set our cursorStart to the selection anchor
+        // that the block of code above made sure is on the last character and set our cursorStop
+        // to the newPosition moved to the right through line breaks including the EOL.
+        // Remember that VSCode selection is 'exclusive' (doesn't include the character on the
+        // cursor so in order to select the EOL we need to put the cursor on column 0 of the next line
+        this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
+        // this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
+        this.vimState.cursorStopPosition = newPosition; // .getRightThroughLineBreaks(true);
+        this.vimState.ignoreNextSelectionChange = true;
+        this.vimState.editor.selection = new vscode.Selection(
+          this.vimState.cursorStartPosition,
+          this.vimState.cursorStopPosition.getRightThroughLineBreaks(true)
+        );
+        if (
+          configuration.mouseSelectionGoesIntoVisualMode &&
+          !isVisualMode(this.vimState.currentMode) &&
+          this.currentMode !== Mode.Insert &&
+          this.currentMode !== Mode.Replace
+        ) {
+          this.vimState.currentSelectionFromMouse = true;
+          await this.setCurrentMode(Mode.Visual);
+        }
+
+        /**
+         * SECOND IF BRANCH
+         */
+      } else if (
+        !selection.anchor.isEqual(selection.active) || // &&
+        // !(
+        //   isVisualMode(this.vimState.currentMode) &&
+        //   selection.anchor.line === selection.active.line &&
+        //   selection.anchor.character === selection.active.character + 1
+        // )
+        (isVisualMode(this.vimState.currentMode) &&
+          // inSurroundingOfSelectionAnchor(this.vimState.cursorStopPosition) &&
+          ((this.vimState.cursorStopPosition.isAfter(this.vimState.cursorStartPosition) &&
+            selection.anchor.isEqual(this.vimState.cursorStartPosition)) ||
+            (this.vimState.cursorStopPosition.isBefore(this.vimState.cursorStartPosition) &&
+              selection.anchor.isEqual(this.vimState.cursorStartPosition.getRight())) ||
+            (this.vimState.cursorStopPosition.isEqual(this.vimState.cursorStartPosition) &&
+              selection.anchor.isEqual(this.vimState.cursorStartPosition)) ||
+            (this.vimState.cursorStopPosition.isEqual(this.vimState.cursorStartPosition) &&
+              selection.anchor.isEqual(this.vimState.cursorStartPosition.getRight()))))
+        // (isVisualMode(this.vimState.currentMode) &&
+        //   selection.anchor.line === this.vimState.cursorStopPosition.line &&
+        //   selection.anchor.character === this.vimState.cursorStopPosition.character + 1 &&
+        //   selection.anchor.isEqual(this.vimState.cursorStartPosition))
+      ) {
+        this.vimState.ignoreNextSelectionChange = true;
         let selectionStart = new Position(selection.anchor.line, selection.anchor.character);
 
-        if (selectionStart.character > selectionStart.getLineEnd().character) {
+        if (selectionStart.character >= selectionStart.getLineEnd().character) {
           selectionStart = new Position(selectionStart.line, selectionStart.getLineEnd().character);
         }
 
-        this.vimState.cursorStartPosition = selectionStart;
+        // this.vimState.cursorStartPosition = selectionStart;
 
-        if (selectionStart.isAfter(newPosition)) {
-          this.vimState.cursorStartPosition = this.vimState.cursorStartPosition.getLeft();
+        // if (selectionStart.isAfter(newPosition)) {
+        //   this.vimState.cursorStartPosition = this.vimState.cursorStartPosition.getLeft();
+        // }
+
+        // // If we prevented from clicking past eol but it is part of this selection, include the last char
+        // if (this.vimState.lastClickWasPastEol) {
+        //   const newStart = new Position(selection.anchor.line, selection.anchor.character + 1);
+        //   this.vimState.editor.selection = new vscode.Selection(newStart, selection.end);
+        //   // this.vimState.cursorStartPosition = selectionStart;
+        //   this.vimState.cursorStartPosition = newStart;
+        //   this.vimState.lastClickWasPastEol = false;
+        // }
+
+        // VSCodes Selections are 'exclusive', meaning they don't include the 'end' character, but
+        // Vim uses 'inclusive' selections, when you start selecting with mouse in Vim the character
+        // you press first is included in the selection even when moving backwards while VSCode doesn't
+        // include it, so here we make VSCode include it by moving their selection to the right.
+        if (
+          this.vimState.isClickStartingANewSelection &&
+          !isVisualMode(this.vimState.currentMode) // &&
+          // this.currentMode !== Mode.Insert &&
+          // this.currentMode !== Mode.Replace
+        ) {
+          this.vimState.isClickStartingANewSelection = false;
+          // if (!this.vimState.cursorStartPosition.isEqual(selectionStart)) {
+          if (newPosition.isAfter(selectionStart)) {
+            // It either was a Double-click selection or the start of a dragging selection
+            // to the right, in either case we don't move our cursor stop position to the
+            // active yet.
+            // ???
+            newPosition = new Position(newPosition.line, newPosition.character - 1);
+            this.vimState.editor.selection = new vscode.Selection(selectionStart, newPosition);
+            this.vimState.cursorStartPosition = selectionStart;
+          }
+          if (selectionStart.isAfter(newPosition)) {
+            // this.vimState.cursorStartPosition = this.vimState.cursorStartPosition.getRight();
+            const newStart = new Position(selection.anchor.line, selection.anchor.character + 1);
+            // this.vimState.editor.selection = new vscode.Selection(newStart, selection.end);
+            this.vimState.editor.selection = new vscode.Selection(newStart, newPosition);
+          }
+        } else {
+          if (
+            newPosition.isAfterOrEqual(selectionStart) &&
+            this.vimState.cursorStopPosition.isBefore(selectionStart)
+          ) {
+            // We are now after or at anchor but were previously before anchor
+            const newStart = new Position(selection.anchor.line, selection.anchor.character - 1);
+            // this.vimState.cursorStartPosition = newStart;
+            this.vimState.editor.selection = new vscode.Selection(newStart, newPosition);
+          } else if (
+            newPosition.isBefore(selectionStart) &&
+            this.vimState.cursorStopPosition.isAfterOrEqual(selectionStart)
+          ) {
+            // We are now before anchor but were previously after or at the anchor
+            // this.vimState.cursorStartPosition = Position.FromVSCodePosition(
+            //   this.vimState.editor.selection.anchor
+            // );
+            const newStart = new Position(selection.anchor.line, selection.anchor.character + 1);
+            this.vimState.editor.selection = new vscode.Selection(newStart, newPosition);
+          }
+          // else if (
+          //   this.vimState.cursorStartPosition.isEqual(this.vimState.cursorStopPosition) &&
+          //   newPosition.isAfter(selectionStart)
+          // ) {
+          //   // Double-click selection???
+          //   const newEnd = new Position(selection.active.line, selection.active.character - 1);
+          //   this.vimState.editor.selection = new vscode.Selection(selectionStart, newEnd);
+          //   this.vimState.cursorStartPosition = selectionStart;
+          //   this.vimState.cursorStopPosition = newEnd;
+          // }
         }
 
-        // If we prevented from clicking past eol but it is part of this selection, include the last char
-        if (this.vimState.lastClickWasPastEol) {
-          const newStart = new Position(selection.anchor.line, selection.anchor.character + 1);
-          this.vimState.editor.selection = new vscode.Selection(newStart, selection.end);
-          this.vimState.cursorStartPosition = selectionStart;
-          this.vimState.lastClickWasPastEol = false;
+        // Finally set our cursorStopPosition
+        if (newPosition.isAfterOrEqual(this.vimState.editor.selection.anchor)) {
+          // this.vimState.cursorStopPosition = newPosition.getRight();
+          // this.vimState.editor.selection = new vscode.Selection(
+          //   this.vimState.editor.selection.anchor,
+          //   newPosition.getRight()
+          // );
+          this.vimState.cursorStopPosition = newPosition;
+        } else {
+          this.vimState.cursorStopPosition = newPosition;
         }
+
+        // selection.anchor = selection.anchor.translate(0, 1);
+        // this.vimState.cursorStartPosition = selectionStart;
+        // this.vimState.cursorStartPosition = this.vimState.cursorStartPosition.getRight();
 
         if (
           configuration.mouseSelectionGoesIntoVisualMode &&
           !isVisualMode(this.vimState.currentMode) &&
-          this.currentMode !== Mode.Insert
+          this.currentMode !== Mode.Insert &&
+          this.currentMode !== Mode.Replace
         ) {
+          this.vimState.currentSelectionFromMouse = true;
           await this.setCurrentMode(Mode.Visual);
 
           // double click mouse selection causes an extra character to be selected so take one less character
         }
-      } else if (this.vimState.currentMode !== Mode.Insert) {
+
+        /**
+         * THIRD IF BRANCH
+         */
+      } else if (
+        this.vimState.currentMode !== Mode.Insert &&
+        this.vimState.currentMode !== Mode.Replace
+      ) {
+        // It was a click not a selection
+        this.vimState.cursorStopPosition = newPosition;
+        this.vimState.cursorStartPosition = newPosition;
+        // this.vimState.desiredColumn = newPosition.character;
+        // await this.vimState.setDesiredColumn(newPosition.character);
+        // Switch back to normal mode since it was a click not a selection
         await this.setCurrentMode(Mode.Normal);
       }
 
@@ -588,13 +810,16 @@ export class ModeHandler implements vscode.Disposable {
       if (action instanceof BaseMovement) {
         // We check !operator here because e.g. d$ should NOT set the desired column to EOL.
         if (action.setsDesiredColumnToEOL && !recordedState.operator) {
-          vimState.desiredColumn = Number.POSITIVE_INFINITY;
+          // vimState.desiredColumn = Number.POSITIVE_INFINITY;
+          await vimState.setDesiredColumn(Number.POSITIVE_INFINITY);
         } else {
-          vimState.desiredColumn = vimState.cursorStopPosition.character;
+          // vimState.desiredColumn = vimState.cursorStopPosition.character;
+          await vimState.setDesiredColumn(vimState.cursorStopPosition.character);
         }
       } else if (vimState.currentMode !== Mode.VisualBlock) {
         // TODO: explain why not VisualBlock
-        vimState.desiredColumn = vimState.cursorStopPosition.character;
+        // vimState.desiredColumn = vimState.cursorStopPosition.character;
+        await vimState.setDesiredColumn(vimState.cursorStopPosition.character);
       }
     }
 
@@ -1216,6 +1441,7 @@ export class ModeHandler implements vscode.Disposable {
         (action) => action instanceof DocumentContentChangeAction
       )
     ) {
+      vimState.ignoreNextSelectionChange = true;
       let selectionMode: Mode = vimState.currentMode;
       if (vimState.currentMode === Mode.SearchInProgressMode) {
         selectionMode = globalState.searchState!.previousMode;
@@ -1270,6 +1496,7 @@ export class ModeHandler implements vscode.Disposable {
       }
 
       this.vimState.editor.selections = selections;
+      // vimState.ignoreSelectionChange = false;
     }
 
     // Scroll to position of cursor
@@ -1365,7 +1592,8 @@ export class ModeHandler implements vscode.Disposable {
       if (this.currentMode === Mode.Visual) {
         for (const { start: cursorStart, stop: cursorStop } of vimState.cursors) {
           if (cursorStart.isBefore(cursorStop)) {
-            cursorRange.push(new vscode.Range(cursorStop.getLeft(), cursorStop));
+            // cursorRange.push(new vscode.Range(cursorStop.getLeft(), cursorStop));
+            cursorRange.push(new vscode.Range(cursorStop, cursorStop.getRight()));
           } else {
             cursorRange.push(new vscode.Range(cursorStop, cursorStop.getRight()));
           }
@@ -1418,6 +1646,7 @@ export class ModeHandler implements vscode.Disposable {
     if (!/\s+/.test(vimState.editor.document.getText(range))) {
       vscode.commands.executeCommand('editor.action.wordHighlight.trigger');
     }
+    // vimState.ignoreNextSelectionChange = false;
   }
 
   // Return true if a new undo point should be created based on brackets and parentheses

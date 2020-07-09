@@ -291,6 +291,14 @@ export async function activate(
         return;
       }
 
+      if (
+        mh.vimState.ignoreNextSelectionChange &&
+        e.kind === vscode.TextEditorSelectionChangeKind.Command
+      ) {
+        mh.vimState.ignoreNextSelectionChange = false;
+        return;
+      }
+
       taskQueue.enqueueTask(
         () => mh.handleSelectionChange(e),
         undefined,
