@@ -43,6 +43,7 @@ import { Notation } from '../configuration/notation';
 import { ModeHandlerMap } from './modeHandlerMap';
 import { EditorIdentity } from '../editorIdentity';
 import { BaseOperator } from '../actions/operator';
+import { lineCompletionProvider } from '../completion/lineCompletionProvider';
 
 /**
  * ModeHandler is the extension's backbone. It listens to events and updates the VimState.
@@ -124,7 +125,15 @@ export class ModeHandler implements vscode.Disposable {
    * Anyone who wants to change the behavior of this method should make sure
    * all selection related test cases pass. Follow this spec
    * https://gist.github.com/rebornix/d21d1cc060c009d4430d3904030bd4c1 to
-   * perform the manual testing.
+   * perform the manual testing. Besides this testing you should still test
+   * commands like 'editor.action.smartSelect.grow' and you should test moving
+   * continuously up/down or left/right with and without remapped movement keys
+   * because sometimes vscode lags behind and calls this function with information
+   * that is not up to date with our selections yet and we need to make sure we don't
+   * change our cursors to previous information (this usally is only an issue in visual
+   * mode because of our different ways of handling selections and in those cases
+   * updating our cursors with not up to date info might result in us changing our
+   * cursor start position).
    */
   public async handleSelectionChange(e: vscode.TextEditorSelectionChangeEvent): Promise<void> {
     let selection = e.selections[0];
@@ -146,23 +155,171 @@ export class ModeHandler implements vscode.Disposable {
       return this.updateView(this.vimState);
     }
 
+    // Check if VSCode selection is the same as Vim selection
+    if (e.selections.length === this.vimState.cursors.length) {
+      let sameSelection = true;
+      for (let i = 0; i < e.selections.length; i++) {
+        const sel = e.selections[i];
+        const vimSel = this.vimState.cursors[i];
+
+        // Are the selections the same? In this case, an empty selection
+        if (sel.anchor.isEqual(vimSel.start) && sel.active.isEqual(vimSel.stop)) {
+          continue;
+        }
+
+        // If we are in Visual mode there are some edge cases we need to consider when comparing
+        // the selections because of the different ways that Vim and VSCode handle selections.
+        if (this.vimState.currentMode === Mode.Visual) {
+          // When vim.cursorStartPosition is after vim.cursorStopPosition we put the VSCode selection
+          // anchor 1 character to the right of our start to include that character in the selection.
+          // So here we check if that is the case right now.
+          if (
+            sel.active.isEqual(vimSel.stop) &&
+            vimSel.start.isAfter(vimSel.stop) &&
+            vimSel.start.getRight().isEqual(sel.anchor)
+          ) {
+            continue;
+          }
+
+          // a) When we include the lineBreak, vim selection goes to the next line column 0.
+          // b) When we have a selection with one character only the vim selection will have
+          // the start and stop positions equal, while vscode might have the active character
+          // one to the right of anchor.
+          // Here we check those two cases.
+          if (
+            sel.anchor.isEqual(vimSel.start) &&
+            vimSel.start.isBeforeOrEqual(vimSel.stop) &&
+            // a)
+            ((vimSel.stop.getLeftThroughLineBreaks().isLineEnd() &&
+              vimSel.stop.getLeftThroughLineBreaks().isEqual(sel.active)) ||
+              // b)
+              (vimSel.start.isEqual(vimSel.stop) && vimSel.stop.getRight().isEqual(sel.active)))
+          ) {
+            continue;
+          }
+        }
+
+        // If none of the cases before applied then the selection is not equal
+        sameSelection = false;
+        break;
+      }
+
+      if (sameSelection) {
+        return;
+      }
+    }
+
     /**
      * We only trigger our view updating process if it's a mouse selection.
      * Otherwise we only update our internal cursor positions accordingly.
      */
     if (e.kind !== vscode.TextEditorSelectionChangeKind.Mouse) {
       if (selection) {
+        if (e.kind === vscode.TextEditorSelectionChangeKind.Command) {
+          // This 'Command' kind is triggered when using a command like 'editor.action.smartSelect.grow'
+          // but it is also triggered when we set the 'editor.selections' on 'updateView'.
+          if (
+            this.vimState.currentMode !== Mode.VisualLine &&
+            this.vimState.currentMode !== Mode.VisualBlock
+          ) {
+            if (this.vimState.currentMode === Mode.Visual) {
+              // Check if vscode selection changed events are lagging behind
+              if (
+                (this.vimState.cursorStartPosition.isEqual(selection.anchor) ||
+                  this.vimState.cursorStartPosition.getRight().isEqual(selection.anchor)) &&
+                // Lagging behind either going up or down
+                (Math.abs(this.vimState.cursorStopPosition.line - selection.active.line) === 1 ||
+                  // Lagging behind when going up and the next position was at line end which is changed
+                  // to next line 0 column and this lagged vscode selection is on that same line still
+                  Math.abs(
+                    this.vimState.cursorStopPosition.getLeftThroughLineBreaks().line -
+                      selection.active.line
+                  ) === 1 ||
+                  // Lagging behind when going down and the previous position was at line end which is
+                  // changed to next line 0 column which is what this lagged vscode selection is still on,
+                  // and it is on the same line of our current position
+                  Math.abs(
+                    Position.FromVSCodePosition(selection.active).getLeftThroughLineBreaks().line -
+                      this.vimState.cursorStopPosition.line
+                  ) === 1 ||
+                  // Lagging behind either when going left or right before starting position
+                  // (didn't include movement after starting position here because if that happens the
+                  // start position will be the same as anchor anyway. And this situation would conflict
+                  // with commands like expand selection where getting a visual selection which has the
+                  // active cursor one to the right of our previous cursorStopPosition happens a few times
+                  // and it would be caught here as if it was a lagging issue.)
+                  (this.vimState.cursorStopPosition.line === selection.active.line &&
+                    this.vimState.cursorStartPosition.isAfter(this.vimState.cursorStopPosition) &&
+                    Math.abs(
+                      this.vimState.cursorStopPosition.character - selection.active.character
+                    ) === 1))
+              ) {
+                // Vscodes selection changed event is lagging behind. This sometimes happens when
+                // you are moving by continuously pressing the movement key. In those cases we don't
+                // want to update our cursor positions because the next selection event will be equal
+                // to our cursors and we don't want to change our cursors.
+                return;
+              }
+
+              // Since the selections were different and we are not lagging behind then probably we got
+              // change of selection from a command, so we need to update our start and stop positions.
+              // This is where commands like 'editor.action.smartSelect.grow' are handled.
+              this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
+              this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
+              await this.updateView(this.vimState, { drawSelection: false, revealRange: false });
+            }
+            if (
+              !selection.active.isEqual(selection.anchor) &&
+              !isVisualMode(this.vimState.currentMode)
+            ) {
+              this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
+              this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
+              await this.setCurrentMode(Mode.Visual);
+              await this.updateView(this.vimState, { drawSelection: false, revealRange: false });
+            }
+          }
+          return;
+        }
+        // Here we are on the selection changed of kind 'Keyboard' which is triggered when pressing
+        // movement keys that are not caught on the 'type' override but also when using commands
+        // like 'moveCursor'.
+
         if (isVisualMode(this.vimState.currentMode)) {
           /**
            * In Visual Mode, our `cursorPosition` and `cursorStartPosition` can not reflect `active`,
            * `start`, `end` and `anchor` information in a selection.
            * See `Fake block cursor with text decoration` section of `updateView` method.
+           * Besides this, sometime on visual modes our start position is not the same has vscode
+           * anchor because we need to move vscode anchor one to the right of our start when our start
+           * is after our stop in order to include the start character on vscodes selection.
            */
           return;
         }
 
+        // We get here when we use a 'cursorMove' command (that is considered a selection changed
+        // kind of 'Keyboard') that ends past the line break. But our cursors are already on last
+        // character which is what we want. Even though our cursors will be corrected again when
+        // checking if they are in bounds on 'runAction' there is no need to be changing them back
+        // and forth so we check for this situation here.
+        if (
+          this.vimState.cursorStopPosition.isEqual(this.vimState.cursorStartPosition) &&
+          this.vimState.cursorStopPosition.getRight().isLineEnd() &&
+          this.vimState.cursorStopPosition.getLineEnd().isEqual(selection.active)
+        ) {
+          return;
+        }
+
+        // Here we allow other 'cursorMove' commands to update our cursors in case there is another
+        // extension making cursor changes that we need to catch. We also get here in cases like
+        // the fold fix up/down movements. But we need to allow them because there is no way to
+        // distinguish them from other extensions movements. And also they will be corrected on
+        // the action execution after the movement anyway.
+        //
+        // We still need to be careful with this because this here might be changing our cursors
+        // in ways we don't want to. So with future selection issues this is a good place to start
+        // looking.
         this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
-        this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.start);
+        this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
       }
       return;
     }
