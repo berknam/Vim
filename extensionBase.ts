@@ -279,18 +279,65 @@ export async function activate(
       // We may receive changes from other panels when, having selections in them containing the same file
       // and changing text before the selection in current panel.
       if (e.textEditor !== mh.vimState.editor) {
+        globalState.selectionsChanged.selectionsToIgnore = Math.max(
+          globalState.selectionsChanged.selectionsToIgnore - 1,
+          0
+        );
+        globalState.selectionsChanged.totalSelectionsToIgnore = Math.max(
+          globalState.selectionsChanged.totalSelectionsToIgnore - 1,
+          0
+        );
+        globalState.selectionsChanged.enqueuedSelections = Math.max(
+          globalState.selectionsChanged.enqueuedSelections - 1,
+          0
+        );
         return;
       }
 
       if (mh.vimState.focusChanged) {
         mh.vimState.focusChanged = false;
+        globalState.selectionsChanged.selectionsToIgnore = Math.max(
+          globalState.selectionsChanged.selectionsToIgnore - 1,
+          0
+        );
+        globalState.selectionsChanged.totalSelectionsToIgnore = Math.max(
+          globalState.selectionsChanged.totalSelectionsToIgnore - 1,
+          0
+        );
+        globalState.selectionsChanged.enqueuedSelections = Math.max(
+          globalState.selectionsChanged.enqueuedSelections - 1,
+          0
+        );
         return;
       }
 
       if (mh.currentMode === Mode.EasyMotionMode) {
+        globalState.selectionsChanged.selectionsToIgnore = Math.max(
+          globalState.selectionsChanged.selectionsToIgnore - 1,
+          0
+        );
+        globalState.selectionsChanged.totalSelectionsToIgnore = Math.max(
+          globalState.selectionsChanged.totalSelectionsToIgnore - 1,
+          0
+        );
+        globalState.selectionsChanged.enqueuedSelections = Math.max(
+          globalState.selectionsChanged.enqueuedSelections - 1,
+          0
+        );
         return;
       }
 
+      // mh.vimState.selectionsChanged.enqueuedSelections += 1;
+      // if (
+      //   mh.vimState.selectionsChanged.selectionsToIgnore >= 1 &&
+      //   mh.vimState.selectionsChanged.enqueuedSelections >
+      //     mh.vimState.selectionsChanged.totalSelectionsToIgnore
+      // ) {
+      //   mh.vimState.selectionsChanged.totalSelectionsToIgnore =
+      //     mh.vimState.selectionsChanged.enqueuedSelections;
+      //   mh.vimState.selectionsChanged.selectionsToIgnore =
+      //     mh.vimState.selectionsChanged.enqueuedSelections;
+      // }
       taskQueue.enqueueTask(
         () => mh.handleSelectionChange(e),
         undefined,
@@ -302,7 +349,7 @@ export async function activate(
       );
     },
     true,
-    true
+    false
   );
 
   const compositionState = new CompositionState();
@@ -506,9 +553,27 @@ function registerEventListener<T>(
       return;
     }
 
+    if (instanceOfSelectionChangeEvent(e)) {
+      globalState.selectionsChanged.enqueuedSelections += 1;
+      if (
+        globalState.selectionsChanged.selectionsToIgnore >= 1 &&
+        globalState.selectionsChanged.enqueuedSelections >
+          globalState.selectionsChanged.totalSelectionsToIgnore
+      ) {
+        globalState.selectionsChanged.totalSelectionsToIgnore =
+          globalState.selectionsChanged.enqueuedSelections;
+        globalState.selectionsChanged.selectionsToIgnore =
+          globalState.selectionsChanged.enqueuedSelections;
+      }
+    }
+
     listener(e);
   });
   context.subscriptions.push(disposable);
+}
+
+function instanceOfSelectionChangeEvent(e): e is vscode.TextEditorSelectionChangeEvent {
+  return e && 'selections' in e && 'kind' in e && 'textEditor' in e;
 }
 
 async function handleKeyEvent(key: string): Promise<void> {

@@ -53,6 +53,15 @@ class GlobalState {
    */
   public hl = true;
 
+  /**
+   * Used internally to ignore selection changes that were performed by us.
+   */
+  public selectionsChanged = {
+    enqueuedSelections: 0,
+    selectionsToIgnore: 0,
+    totalSelectionsToIgnore: 0,
+  };
+
   public async load() {
     this._searchHistory = new SearchHistory();
     this._searchHistory

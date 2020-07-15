@@ -209,6 +209,13 @@ export class VimState implements vscode.Disposable {
    */
   public lastClickWasPastEol: boolean = false;
 
+  // public ignoreSelectionChange: number = 0;
+  // public selectionsChanged = {
+  //   enqueuedSelections: 0,
+  //   selectionsToIgnore: 0,
+  //   totalSelectionsToIgnore: 0,
+  // };
+
   /**
    * The mode Vim will be in once this action finishes.
    */
