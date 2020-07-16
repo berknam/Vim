@@ -137,11 +137,6 @@ export class ModeHandler implements vscode.Disposable {
    */
   public async handleSelectionChange(e: vscode.TextEditorSelectionChangeEvent): Promise<void> {
     let selection = e.selections[0];
-    // if (this.vimState.ignoreSelectionChange >= 1) {
-    //   this.vimState.ignoreSelectionChange -= 1;
-    //   console.log(`Selection Change Ignored! Count: ${this.vimState.ignoreSelectionChange}`);
-    //   return;
-    // }
     if (globalState.selectionsChanged.totalSelectionsToIgnore >= 1) {
       globalState.selectionsChanged.selectionsToIgnore = Math.max(
         globalState.selectionsChanged.selectionsToIgnore - 1,
@@ -262,46 +257,7 @@ export class ModeHandler implements vscode.Disposable {
             this.vimState.currentMode !== Mode.VisualBlock
           ) {
             if (this.vimState.currentMode === Mode.Visual) {
-              // Check if vscode selection changed events are lagging behind
-              if (
-                false &&
-                (this.vimState.cursorStartPosition.isEqual(selection.anchor) ||
-                  this.vimState.cursorStartPosition.getRight().isEqual(selection.anchor)) &&
-                // Lagging behind either going up or down
-                (Math.abs(this.vimState.cursorStopPosition.line - selection.active.line) === 1 ||
-                  // Lagging behind when going up and the next position was at line end which is changed
-                  // to next line 0 column and this lagged vscode selection is on that same line still
-                  Math.abs(
-                    this.vimState.cursorStopPosition.getLeftThroughLineBreaks().line -
-                      selection.active.line
-                  ) === 1 ||
-                  // Lagging behind when going down and the previous position was at line end which is
-                  // changed to next line 0 column which is what this lagged vscode selection is still on,
-                  // and it is on the same line of our current position
-                  Math.abs(
-                    Position.FromVSCodePosition(selection.active).getLeftThroughLineBreaks().line -
-                      this.vimState.cursorStopPosition.line
-                  ) === 1 ||
-                  // Lagging behind either when going left or right before starting position
-                  // (didn't include movement after starting position here because if that happens the
-                  // start position will be the same as anchor anyway. And this situation would conflict
-                  // with commands like expand selection where getting a visual selection which has the
-                  // active cursor one to the right of our previous cursorStopPosition happens a few times
-                  // and it would be caught here as if it was a lagging issue.)
-                  (this.vimState.cursorStopPosition.line === selection.active.line &&
-                    this.vimState.cursorStartPosition.isAfter(this.vimState.cursorStopPosition) &&
-                    Math.abs(
-                      this.vimState.cursorStopPosition.character - selection.active.character
-                    ) === 1))
-              ) {
-                // Vscodes selection changed event is lagging behind. This sometimes happens when
-                // you are moving by continuously pressing the movement key. In those cases we don't
-                // want to update our cursor positions because the next selection event will be equal
-                // to our cursors and we don't want to change our cursors.
-                return;
-              }
-
-              // Since the selections were different and we are not lagging behind then probably we got
+              // Since the selections were different and we are not ignored then probably we got
               // change of selection from a command, so we need to update our start and stop positions.
               // This is where commands like 'editor.action.smartSelect.grow' are handled.
               console.log('Updating Visual Selection!');
@@ -322,9 +278,9 @@ export class ModeHandler implements vscode.Disposable {
           }
           return;
         }
-        // Here we are on the selection changed of kind 'Keyboard' which is triggered when pressing
-        // movement keys that are not caught on the 'type' override but also when using commands
-        // like 'moveCursor'.
+        // Here we are on the selection changed of kind 'Keyboard' or 'undefined' which is triggered
+        // when pressing movement keys that are not caught on the 'type' override but also when using
+        // commands like 'cursorMove'.
 
         if (isVisualMode(this.vimState.currentMode)) {
           /**
@@ -367,7 +323,7 @@ export class ModeHandler implements vscode.Disposable {
         );
         this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
         this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
-        // await this.updateView(this.vimState, { drawSelection: false, revealRange: false });
+        await this.updateView(this.vimState, { drawSelection: false, revealRange: false });
       }
       return;
     }
@@ -1486,40 +1442,47 @@ export class ModeHandler implements vscode.Disposable {
         }
       }
 
+      // Check if the selection we are going wo set is different than the current one.
+      // If they are the same vscode won't trigger a selectionChangeEvent so we don't
+      // have to add one to the ignore count.
       const willTriggerChange =
         selections.length !== vimState.editor.selections.length
           ? true
           : selections.map((s, i) => !s.isEqual(vimState.editor.selections[i])).some((b) => b);
 
-      if (true) {
-        // this.vimState.ignoreSelectionChange += 1;
-        // console.log(
-        //   `Adding Selection Change to be Ignored! Count: ${
-        //     this.vimState.ignoreSelectionChange
-        //   }, Selections: ${Position.FromVSCodePosition(
-        //     selections[0].anchor
-        //   ).toString()}, ${Position.FromVSCodePosition(selections[0].active).toString()}`
-        // );
-        // this.vimState.selectionsChanged.selectionsToIgnore++;
-        if (!Globals.isTesting) {
-          globalState.selectionsChanged.selectionsToIgnore += willTriggerChange ? 1 : 0;
-        } else {
-          globalState.selectionsChanged.selectionsToIgnore++;
-        }
-        globalState.selectionsChanged.totalSelectionsToIgnore =
-          globalState.selectionsChanged.enqueuedSelections +
-          globalState.selectionsChanged.selectionsToIgnore;
-        console.log(
-          `Adding Selection Change to be Ignored! Count: ${
-            globalState.selectionsChanged.selectionsToIgnore
-          }, EnqueueCount: ${
-            globalState.selectionsChanged.enqueuedSelections
-          }, Selections: ${Position.FromVSCodePosition(
-            selections[0].anchor
-          ).toString()}, ${Position.FromVSCodePosition(selections[0].active).toString()}`
-        );
-        this.vimState.editor.selections = selections;
+      if (!Globals.isTesting) {
+        globalState.selectionsChanged.selectionsToIgnore += willTriggerChange ? 1 : 0;
+      } else {
+        // When testing the selectionChangeEvents don't always trigger at the expected moment due
+        // to the fast speeds things are performed. Sometimes all the changes trigger at the end
+        // but sometimes the change is triggered in between the action being performed and the
+        // updateView being called which results in that selection not being ignored, changing
+        // vim cursors which then the updateView will set the selection using the changed incorrect
+        // cursors. By always adding one even when the selection is the same we create extra ignores
+        // that will cancel those situations. This is completely hacky! But I couldn't find a better
+        // way of making the tests work. In the future some tests might fail because of this, the
+        // easiest way to troubleshoot that is to change the 'registerEventListener' for the selections
+        // have the 'exitOnTests' set to true, if those tests then pass this was the culprit.
+        globalState.selectionsChanged.selectionsToIgnore++;
       }
+
+      // Include any selections that might have been enqueued while performing the current set of actions
+      // on the selections to ignore.
+      globalState.selectionsChanged.totalSelectionsToIgnore =
+        globalState.selectionsChanged.enqueuedSelections +
+        globalState.selectionsChanged.selectionsToIgnore;
+
+      console.log(
+        `Adding Selection Change to be Ignored! Count: ${
+          globalState.selectionsChanged.selectionsToIgnore
+        }, EnqueueCount: ${
+          globalState.selectionsChanged.enqueuedSelections
+        }, Selections: ${Position.FromVSCodePosition(
+          selections[0].anchor
+        ).toString()}, ${Position.FromVSCodePosition(selections[0].active).toString()}`
+      );
+
+      this.vimState.editor.selections = selections;
     }
 
     // Scroll to position of cursor
