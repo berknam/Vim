@@ -66,6 +66,7 @@ class GlobalState {
     enqueuedSelections: 0,
     selectionsToIgnore: 0,
     totalSelectionsToIgnore: 0,
+    ignoreIntermediateSelections: false,
   };
 
   public async load() {

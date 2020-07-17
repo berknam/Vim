@@ -338,6 +338,7 @@ export async function activate(
       //   mh.vimState.selectionsChanged.selectionsToIgnore =
       //     mh.vimState.selectionsChanged.enqueuedSelections;
       // }
+      console.log('enqueueing selection');
       taskQueue.enqueueTask(
         () => mh.handleSelectionChange(e),
         undefined,
@@ -554,6 +555,11 @@ function registerEventListener<T>(
     }
 
     if (instanceOfSelectionChangeEvent(e)) {
+      if (globalState.selectionsChanged.ignoreIntermediateSelections) {
+        console.log('ignoring intermediate selection change');
+        return;
+      }
+      console.log('increasing enqueued selections');
       globalState.selectionsChanged.enqueuedSelections += 1;
       if (
         globalState.selectionsChanged.selectionsToIgnore >= 1 &&

@@ -492,6 +492,7 @@ export class ModeHandler implements vscode.Disposable {
         this.vimState = await this.handleKeyEventHelper(key, this.vimState);
       }
     } catch (e) {
+      globalState.selectionsChanged.ignoreIntermediateSelections = false;
       if (e instanceof VimError) {
         StatusBar.displayError(this.vimState, e);
       } else {
@@ -621,6 +622,8 @@ export class ModeHandler implements vscode.Disposable {
   ): Promise<VimState> {
     let ranRepeatableAction = false;
     let ranAction = false;
+    let initialEnqueuedSelections = globalState.selectionsChanged.enqueuedSelections;
+    globalState.selectionsChanged.ignoreIntermediateSelections = true;
 
     // If arrow keys or mouse was used prior to entering characters while in insert mode, create an undo point
     // this needs to happen before any changes are made
@@ -674,6 +677,15 @@ export class ModeHandler implements vscode.Disposable {
       recordedState.operatorCount = recordedState.count;
     }
 
+    if (globalState.selectionsChanged.enqueuedSelections !== initialEnqueuedSelections) {
+      if (globalState.selectionsChanged.enqueuedSelections > initialEnqueuedSelections) {
+        globalState.selectionsChanged.totalSelectionsToIgnore =
+          globalState.selectionsChanged.enqueuedSelections +
+          globalState.selectionsChanged.selectionsToIgnore;
+      }
+      initialEnqueuedSelections = globalState.selectionsChanged.enqueuedSelections;
+    }
+
     // Update mode (note the ordering allows you to go into search mode,
     // then return and have the motion immediately applied to an operator).
     const prevMode = this.currentMode;
@@ -700,11 +712,22 @@ export class ModeHandler implements vscode.Disposable {
 
     if (recordedState.operatorReadyToExecute(vimState.currentMode)) {
       if (vimState.recordedState.operator) {
+        console.log(`before execute operator. ${globalState.selectionsChanged.enqueuedSelections}`);
         vimState = await this.executeOperator(vimState);
+        console.log('after execute operator');
         vimState.recordedState.hasRunOperator = true;
         ranRepeatableAction = vimState.recordedState.operator!.canBeRepeatedWithDot;
         ranAction = true;
       }
+    }
+
+    if (globalState.selectionsChanged.enqueuedSelections !== initialEnqueuedSelections) {
+      if (globalState.selectionsChanged.enqueuedSelections > initialEnqueuedSelections) {
+        globalState.selectionsChanged.totalSelectionsToIgnore =
+          globalState.selectionsChanged.enqueuedSelections +
+          globalState.selectionsChanged.selectionsToIgnore;
+      }
+      initialEnqueuedSelections = globalState.selectionsChanged.enqueuedSelections;
     }
 
     if (vimState.currentMode === Mode.Visual) {
@@ -844,6 +867,7 @@ export class ModeHandler implements vscode.Disposable {
       };
     }
 
+    globalState.selectionsChanged.ignoreIntermediateSelections = false;
     return vimState;
   }
 
@@ -977,13 +1001,19 @@ export class ModeHandler implements vscode.Disposable {
     }
 
     if (vimState.recordedState.transformations.length > 0) {
+      console.log(
+        `before operator execute command. ${globalState.selectionsChanged.enqueuedSelections}`
+      );
       vimState = await this.executeCommand(vimState);
+      console.log('after operator execute command');
     } else {
       // Keep track of all cursors (in the case of multi-cursor).
+      console.log('before operator set selection');
       vimState.cursors = resultingCursors;
       vimState.editor.selections = vimState.cursors.map(
         (cursor) => new vscode.Selection(cursor.start, cursor.stop)
       );
+      console.log('after operator set selection');
     }
 
     return vimState;
@@ -1075,11 +1105,19 @@ export class ModeHandler implements vscode.Disposable {
         // console.log(
         //   `Adding Selection Change to be Ignored by command! Count: ${this.vimState.ignoreSelectionChange}`
         // );
+        console.log(`before command edit. ${globalState.selectionsChanged.enqueuedSelections} `);
         await this.vimState.editor.edit((edit) => {
           for (const command of textTransformations) {
+            console.log(
+              `before text editor edit. ${globalState.selectionsChanged.enqueuedSelections} `
+            );
             doTextEditorEdit(command, edit);
+            console.log(
+              `after text editor edit. ${globalState.selectionsChanged.enqueuedSelections} `
+            );
           }
         });
+        console.log(`after command edit. ${globalState.selectionsChanged.enqueuedSelections} `);
       }
     }
 
@@ -1233,6 +1271,9 @@ export class ModeHandler implements vscode.Disposable {
       }
     }
 
+    console.log(
+      `before command selections read. ${globalState.selectionsChanged.enqueuedSelections} `
+    );
     const selections = this.vimState.editor.selections.map((sel) => {
       let range = Range.FromVSCodeSelection(sel);
       if (range.start.isBefore(range.stop)) {
@@ -1450,7 +1491,7 @@ export class ModeHandler implements vscode.Disposable {
           ? true
           : selections.map((s, i) => !s.isEqual(vimState.editor.selections[i])).some((b) => b);
 
-      if (!Globals.isTesting) {
+      if (true) {
         globalState.selectionsChanged.selectionsToIgnore += willTriggerChange ? 1 : 0;
       } else {
         // When testing the selectionChangeEvents don't always trigger at the expected moment due
