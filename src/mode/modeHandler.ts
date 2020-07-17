@@ -137,24 +137,26 @@ export class ModeHandler implements vscode.Disposable {
    */
   public async handleSelectionChange(e: vscode.TextEditorSelectionChangeEvent): Promise<void> {
     let selection = e.selections[0];
-    if (globalState.selectionsChanged.totalSelectionsToIgnore >= 1) {
-      globalState.selectionsChanged.selectionsToIgnore = Math.max(
-        globalState.selectionsChanged.selectionsToIgnore - 1,
+    if (this.vimState.selectionsChanged.selectionsToIgnore >= 1) {
+      this.vimState.selectionsChanged.selectionsToIgnore = Math.max(
+        this.vimState.selectionsChanged.selectionsToIgnore - 1,
         0
       );
-      globalState.selectionsChanged.totalSelectionsToIgnore = Math.max(
-        globalState.selectionsChanged.totalSelectionsToIgnore - 1,
+      this.vimState.selectionsChanged.totalSelectionsToIgnore = Math.max(
+        this.vimState.selectionsChanged.totalSelectionsToIgnore - 1,
         0
       );
-      globalState.selectionsChanged.enqueuedSelections = Math.max(
-        globalState.selectionsChanged.enqueuedSelections - 1,
+      this.vimState.selectionsChanged.enqueuedSelections = Math.max(
+        this.vimState.selectionsChanged.enqueuedSelections - 1,
         0
       );
       console.log(
         `Selection Change Ignored! Ignore Count: ${
-          globalState.selectionsChanged.selectionsToIgnore
+          this.vimState.selectionsChanged.selectionsToIgnore
         }, Enqueue Count: ${
-          globalState.selectionsChanged.enqueuedSelections
+          this.vimState.selectionsChanged.enqueuedSelections
+        }, Total Ignore Count: ${
+          this.vimState.selectionsChanged.totalSelectionsToIgnore
         }, Selections: ${Position.FromVSCodePosition(
           selection.anchor
         ).toString()}, ${Position.FromVSCodePosition(selection.active)}`
@@ -166,8 +168,8 @@ export class ModeHandler implements vscode.Disposable {
         selection.anchor
       ).toString()}, ${Position.FromVSCodePosition(selection.active)}`
     );
-    globalState.selectionsChanged.enqueuedSelections = Math.max(
-      globalState.selectionsChanged.enqueuedSelections - 1,
+    this.vimState.selectionsChanged.enqueuedSelections = Math.max(
+      this.vimState.selectionsChanged.enqueuedSelections - 1,
       0
     );
 
@@ -186,6 +188,12 @@ export class ModeHandler implements vscode.Disposable {
             Position.FromVSCodePosition(sel.active)
           )
       );
+      if (
+        e.textEditor.selections.some((s) => !s.anchor.isEqual(s.active)) &&
+        [Mode.Normal, Mode.Insert, Mode.Replace].includes(this.vimState.currentMode)
+      ) {
+        await this.setCurrentMode(Mode.Visual);
+      }
       return this.updateView(this.vimState);
     }
 
@@ -253,8 +261,20 @@ export class ModeHandler implements vscode.Disposable {
           // This 'Command' kind is triggered when using a command like 'editor.action.smartSelect.grow'
           // but it is also triggered when we set the 'editor.selections' on 'updateView'.
           if (
-            this.vimState.currentMode !== Mode.VisualLine &&
-            this.vimState.currentMode !== Mode.VisualBlock
+            [Mode.Normal, Mode.Visual, Mode.Insert, Mode.Replace].includes(
+              this.vimState.currentMode
+            )
+            // this.vimState.currentMode !== Mode.VisualLine &&
+            // this.vimState.currentMode !== Mode.VisualBlock &&
+            // (this.vimState.surround
+            //   ? this.vimState.surround.previousMode !== Mode.VisualLine &&
+            //     this.vimState.surround.previousMode !== Mode.VisualBlock
+            //   : true) &&
+            // (this.vimState.currentMode === Mode.EasyMotionInputMode ||
+            // this.vimState.currentMode === Mode.EasyMotionMode
+            //   ? this.vimState.easyMotion.previousMode !== Mode.VisualLine &&
+            //     this.vimState.easyMotion.previousMode !== Mode.VisualBlock
+            //   : true)
           ) {
             if (this.vimState.currentMode === Mode.Visual) {
               // Since the selections were different and we are not ignored then probably we got
@@ -264,11 +284,7 @@ export class ModeHandler implements vscode.Disposable {
               this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
               this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
               await this.updateView(this.vimState, { drawSelection: false, revealRange: false });
-            }
-            if (
-              !selection.active.isEqual(selection.anchor) &&
-              !isVisualMode(this.vimState.currentMode)
-            ) {
+            } else if (!selection.active.isEqual(selection.anchor)) {
               console.log('Creating Visual Selection!');
               this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
               this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
@@ -492,7 +508,7 @@ export class ModeHandler implements vscode.Disposable {
         this.vimState = await this.handleKeyEventHelper(key, this.vimState);
       }
     } catch (e) {
-      globalState.selectionsChanged.ignoreIntermediateSelections = false;
+      this.vimState.selectionsChanged.ignoreIntermediateSelections = false;
       if (e instanceof VimError) {
         StatusBar.displayError(this.vimState, e);
       } else {
@@ -622,8 +638,8 @@ export class ModeHandler implements vscode.Disposable {
   ): Promise<VimState> {
     let ranRepeatableAction = false;
     let ranAction = false;
-    let initialEnqueuedSelections = globalState.selectionsChanged.enqueuedSelections;
-    globalState.selectionsChanged.ignoreIntermediateSelections = true;
+    let initialEnqueuedSelections = vimState.selectionsChanged.enqueuedSelections;
+    vimState.selectionsChanged.ignoreIntermediateSelections = true;
 
     // If arrow keys or mouse was used prior to entering characters while in insert mode, create an undo point
     // this needs to happen before any changes are made
@@ -677,13 +693,13 @@ export class ModeHandler implements vscode.Disposable {
       recordedState.operatorCount = recordedState.count;
     }
 
-    if (globalState.selectionsChanged.enqueuedSelections !== initialEnqueuedSelections) {
-      if (globalState.selectionsChanged.enqueuedSelections > initialEnqueuedSelections) {
-        globalState.selectionsChanged.totalSelectionsToIgnore =
-          globalState.selectionsChanged.enqueuedSelections +
-          globalState.selectionsChanged.selectionsToIgnore;
+    if (vimState.selectionsChanged.enqueuedSelections !== initialEnqueuedSelections) {
+      if (vimState.selectionsChanged.enqueuedSelections > initialEnqueuedSelections) {
+        vimState.selectionsChanged.totalSelectionsToIgnore =
+          vimState.selectionsChanged.enqueuedSelections +
+          vimState.selectionsChanged.selectionsToIgnore;
       }
-      initialEnqueuedSelections = globalState.selectionsChanged.enqueuedSelections;
+      initialEnqueuedSelections = vimState.selectionsChanged.enqueuedSelections;
     }
 
     // Update mode (note the ordering allows you to go into search mode,
@@ -712,7 +728,7 @@ export class ModeHandler implements vscode.Disposable {
 
     if (recordedState.operatorReadyToExecute(vimState.currentMode)) {
       if (vimState.recordedState.operator) {
-        console.log(`before execute operator. ${globalState.selectionsChanged.enqueuedSelections}`);
+        console.log(`before execute operator. ${vimState.selectionsChanged.enqueuedSelections}`);
         vimState = await this.executeOperator(vimState);
         console.log('after execute operator');
         vimState.recordedState.hasRunOperator = true;
@@ -721,13 +737,13 @@ export class ModeHandler implements vscode.Disposable {
       }
     }
 
-    if (globalState.selectionsChanged.enqueuedSelections !== initialEnqueuedSelections) {
-      if (globalState.selectionsChanged.enqueuedSelections > initialEnqueuedSelections) {
-        globalState.selectionsChanged.totalSelectionsToIgnore =
-          globalState.selectionsChanged.enqueuedSelections +
-          globalState.selectionsChanged.selectionsToIgnore;
+    if (vimState.selectionsChanged.enqueuedSelections !== initialEnqueuedSelections) {
+      if (vimState.selectionsChanged.enqueuedSelections > initialEnqueuedSelections) {
+        vimState.selectionsChanged.totalSelectionsToIgnore =
+          vimState.selectionsChanged.enqueuedSelections +
+          vimState.selectionsChanged.selectionsToIgnore;
       }
-      initialEnqueuedSelections = globalState.selectionsChanged.enqueuedSelections;
+      initialEnqueuedSelections = vimState.selectionsChanged.enqueuedSelections;
     }
 
     if (vimState.currentMode === Mode.Visual) {
@@ -867,7 +883,7 @@ export class ModeHandler implements vscode.Disposable {
       };
     }
 
-    globalState.selectionsChanged.ignoreIntermediateSelections = false;
+    vimState.selectionsChanged.ignoreIntermediateSelections = false;
     return vimState;
   }
 
@@ -1002,7 +1018,7 @@ export class ModeHandler implements vscode.Disposable {
 
     if (vimState.recordedState.transformations.length > 0) {
       console.log(
-        `before operator execute command. ${globalState.selectionsChanged.enqueuedSelections}`
+        `before operator execute command. ${vimState.selectionsChanged.enqueuedSelections}`
       );
       vimState = await this.executeCommand(vimState);
       console.log('after operator execute command');
@@ -1105,19 +1121,19 @@ export class ModeHandler implements vscode.Disposable {
         // console.log(
         //   `Adding Selection Change to be Ignored by command! Count: ${this.vimState.ignoreSelectionChange}`
         // );
-        console.log(`before command edit. ${globalState.selectionsChanged.enqueuedSelections} `);
+        console.log(`before command edit. ${vimState.selectionsChanged.enqueuedSelections} `);
         await this.vimState.editor.edit((edit) => {
           for (const command of textTransformations) {
             console.log(
-              `before text editor edit. ${globalState.selectionsChanged.enqueuedSelections} `
+              `before text editor edit. ${vimState.selectionsChanged.enqueuedSelections} `
             );
             doTextEditorEdit(command, edit);
             console.log(
-              `after text editor edit. ${globalState.selectionsChanged.enqueuedSelections} `
+              `after text editor edit. ${vimState.selectionsChanged.enqueuedSelections} `
             );
           }
         });
-        console.log(`after command edit. ${globalState.selectionsChanged.enqueuedSelections} `);
+        console.log(`after command edit. ${vimState.selectionsChanged.enqueuedSelections} `);
       }
     }
 
@@ -1272,7 +1288,7 @@ export class ModeHandler implements vscode.Disposable {
     }
 
     console.log(
-      `before command selections read. ${globalState.selectionsChanged.enqueuedSelections} `
+      `before command selections read. ${vimState.selectionsChanged.enqueuedSelections} `
     );
     const selections = this.vimState.editor.selections.map((sel) => {
       let range = Range.FromVSCodeSelection(sel);
@@ -1489,10 +1505,17 @@ export class ModeHandler implements vscode.Disposable {
       const willTriggerChange =
         selections.length !== vimState.editor.selections.length
           ? true
-          : selections.map((s, i) => !s.isEqual(vimState.editor.selections[i])).some((b) => b);
+          : // : selections.map((s, i) => !s.isEqual(vimState.editor.selections[i])).some((b) => b);
+            selections
+              .map(
+                (s, i) =>
+                  !s.anchor.isEqual(vimState.editor.selections[i].anchor) ||
+                  !s.active.isEqual(vimState.editor.selections[i].active)
+              )
+              .some((b) => b);
 
       if (true) {
-        globalState.selectionsChanged.selectionsToIgnore += willTriggerChange ? 1 : 0;
+        vimState.selectionsChanged.selectionsToIgnore += willTriggerChange ? 1 : 0;
       } else {
         // When testing the selectionChangeEvents don't always trigger at the expected moment due
         // to the fast speeds things are performed. Sometimes all the changes trigger at the end
@@ -1504,20 +1527,20 @@ export class ModeHandler implements vscode.Disposable {
         // way of making the tests work. In the future some tests might fail because of this, the
         // easiest way to troubleshoot that is to change the 'registerEventListener' for the selections
         // have the 'exitOnTests' set to true, if those tests then pass this was the culprit.
-        globalState.selectionsChanged.selectionsToIgnore++;
+        vimState.selectionsChanged.selectionsToIgnore++;
       }
 
       // Include any selections that might have been enqueued while performing the current set of actions
       // on the selections to ignore.
-      globalState.selectionsChanged.totalSelectionsToIgnore =
-        globalState.selectionsChanged.enqueuedSelections +
-        globalState.selectionsChanged.selectionsToIgnore;
+      vimState.selectionsChanged.totalSelectionsToIgnore =
+        vimState.selectionsChanged.enqueuedSelections +
+        vimState.selectionsChanged.selectionsToIgnore;
 
       console.log(
-        `Adding Selection Change to be Ignored! Count: ${
-          globalState.selectionsChanged.selectionsToIgnore
-        }, EnqueueCount: ${
-          globalState.selectionsChanged.enqueuedSelections
+        `Adding Selection Change to be Ignored! Ignore Count: ${
+          vimState.selectionsChanged.selectionsToIgnore
+        }, EnqueueCount: ${vimState.selectionsChanged.enqueuedSelections}, TotalIgnoreCount: ${
+          vimState.selectionsChanged.totalSelectionsToIgnore
         }, Selections: ${Position.FromVSCodePosition(
           selections[0].anchor
         ).toString()}, ${Position.FromVSCodePosition(selections[0].active).toString()}`

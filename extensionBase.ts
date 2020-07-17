@@ -276,19 +276,40 @@ export async function activate(
 
       const mh = await getAndUpdateModeHandler();
 
+      if (mh.vimState.selectionsChanged.ignoreIntermediateSelections) {
+        console.log('ignoring intermediate selection change');
+        return;
+      }
+      console.log('increasing enqueued selections');
+      mh.vimState.selectionsChanged.enqueuedSelections += 1;
+      if (
+        mh.vimState.selectionsChanged.selectionsToIgnore >= 1 &&
+        mh.vimState.selectionsChanged.enqueuedSelections >
+          mh.vimState.selectionsChanged.selectionsToIgnore
+      ) {
+        // Some intermediate selection must have slipped in after setting the
+        // 'ignoreIntermediateSelections' to false and the 'updateView'. Which means
+        // we didn't count for it yet, but since we have selections to be ignored
+        // then we probably wanted that one to be ignored as well.
+        mh.vimState.selectionsChanged.totalSelectionsToIgnore =
+          mh.vimState.selectionsChanged.enqueuedSelections;
+        mh.vimState.selectionsChanged.selectionsToIgnore =
+          mh.vimState.selectionsChanged.enqueuedSelections;
+      }
+
       // We may receive changes from other panels when, having selections in them containing the same file
       // and changing text before the selection in current panel.
       if (e.textEditor !== mh.vimState.editor) {
-        globalState.selectionsChanged.selectionsToIgnore = Math.max(
-          globalState.selectionsChanged.selectionsToIgnore - 1,
+        mh.vimState.selectionsChanged.selectionsToIgnore = Math.max(
+          mh.vimState.selectionsChanged.selectionsToIgnore - 1,
           0
         );
-        globalState.selectionsChanged.totalSelectionsToIgnore = Math.max(
-          globalState.selectionsChanged.totalSelectionsToIgnore - 1,
+        mh.vimState.selectionsChanged.totalSelectionsToIgnore = Math.max(
+          mh.vimState.selectionsChanged.totalSelectionsToIgnore - 1,
           0
         );
-        globalState.selectionsChanged.enqueuedSelections = Math.max(
-          globalState.selectionsChanged.enqueuedSelections - 1,
+        mh.vimState.selectionsChanged.enqueuedSelections = Math.max(
+          mh.vimState.selectionsChanged.enqueuedSelections - 1,
           0
         );
         return;
@@ -296,32 +317,32 @@ export async function activate(
 
       if (mh.vimState.focusChanged) {
         mh.vimState.focusChanged = false;
-        globalState.selectionsChanged.selectionsToIgnore = Math.max(
-          globalState.selectionsChanged.selectionsToIgnore - 1,
+        mh.vimState.selectionsChanged.selectionsToIgnore = Math.max(
+          mh.vimState.selectionsChanged.selectionsToIgnore - 1,
           0
         );
-        globalState.selectionsChanged.totalSelectionsToIgnore = Math.max(
-          globalState.selectionsChanged.totalSelectionsToIgnore - 1,
+        mh.vimState.selectionsChanged.totalSelectionsToIgnore = Math.max(
+          mh.vimState.selectionsChanged.totalSelectionsToIgnore - 1,
           0
         );
-        globalState.selectionsChanged.enqueuedSelections = Math.max(
-          globalState.selectionsChanged.enqueuedSelections - 1,
+        mh.vimState.selectionsChanged.enqueuedSelections = Math.max(
+          mh.vimState.selectionsChanged.enqueuedSelections - 1,
           0
         );
         return;
       }
 
       if (mh.currentMode === Mode.EasyMotionMode) {
-        globalState.selectionsChanged.selectionsToIgnore = Math.max(
-          globalState.selectionsChanged.selectionsToIgnore - 1,
+        mh.vimState.selectionsChanged.selectionsToIgnore = Math.max(
+          mh.vimState.selectionsChanged.selectionsToIgnore - 1,
           0
         );
-        globalState.selectionsChanged.totalSelectionsToIgnore = Math.max(
-          globalState.selectionsChanged.totalSelectionsToIgnore - 1,
+        mh.vimState.selectionsChanged.totalSelectionsToIgnore = Math.max(
+          mh.vimState.selectionsChanged.totalSelectionsToIgnore - 1,
           0
         );
-        globalState.selectionsChanged.enqueuedSelections = Math.max(
-          globalState.selectionsChanged.enqueuedSelections - 1,
+        mh.vimState.selectionsChanged.enqueuedSelections = Math.max(
+          mh.vimState.selectionsChanged.enqueuedSelections - 1,
           0
         );
         return;
@@ -554,6 +575,7 @@ function registerEventListener<T>(
       return;
     }
 
+    /*
     if (instanceOfSelectionChangeEvent(e)) {
       if (globalState.selectionsChanged.ignoreIntermediateSelections) {
         console.log('ignoring intermediate selection change');
@@ -572,6 +594,7 @@ function registerEventListener<T>(
           globalState.selectionsChanged.enqueuedSelections;
       }
     }
+    */
 
     listener(e);
   });

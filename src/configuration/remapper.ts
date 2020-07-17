@@ -135,12 +135,14 @@ export class Remapper implements IRemapper {
     if (vimState.currentMode === Mode.Insert) {
       // Revert every single inserted character.
       // We subtract 1 because we haven't actually applied the last key.
+      vimState.selectionsChanged.ignoreIntermediateSelections = true;
       await vimState.historyTracker.undoAndRemoveChanges(
         Math.max(0, numCharsToRemove * vimState.cursors.length)
       );
       vimState.cursors = vimState.cursors.map((c) =>
         c.withNewStop(c.stop.getLeft(numCharsToRemove))
       );
+      vimState.selectionsChanged.ignoreIntermediateSelections = true;
     }
     // We need to remove the keys that were remapped into different keys from the state.
     vimState.recordedState.actionKeys = vimState.recordedState.actionKeys.slice(

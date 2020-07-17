@@ -1495,7 +1495,7 @@ suite('Mode Visual', () => {
         `  },`,
         `]`,
       ],
-      keysPressed: 'a<Esc> af',
+      keysPressed: ' af',
       end: [
         `"vim.normalModeKeyBindingsNonRecursive": [`,
         `  {`,
@@ -1532,7 +1532,7 @@ suite('Mode Visual', () => {
         `  },`,
         `]`,
       ],
-      keysPressed: 'a<Esc> af afd',
+      keysPressed: ' af afd',
       end: [
         `"vim.normalModeKeyBindingsNonRecursive": [`,
         `  {`,
@@ -1569,7 +1569,7 @@ suite('Mode Visual', () => {
         `  },`,
         `]`,
       ],
-      keysPressed: 'a<Esc> afd',
+      keysPressed: ' afd',
       end: [
         `"vim.normalModeKeyBindingsNonRecursive": [`,
         `  {`,
