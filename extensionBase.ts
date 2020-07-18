@@ -288,7 +288,15 @@ export async function activate(
       );
       const idx = mh.vimState.selectionsChanged.ourSelections.indexOf(selectionsHash);
       if (idx > -1) {
+        console.log(
+          `Ignoring selection: ${selectionsHash}, Count left: ${
+            mh.vimState.selectionsChanged.ourSelections.length - 1
+          }`
+        );
         mh.vimState.selectionsChanged.ourSelections.splice(idx, 1);
+        return;
+      } else if (mh.vimState.selectionsChanged.ourSelections.length > 0) {
+        console.log('SHOULD HAVE IGNORED THIS ONE TOO!');
         return;
       }
       console.log('increasing enqueued selections');

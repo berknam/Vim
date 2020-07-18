@@ -284,15 +284,17 @@ export class ModeHandler implements vscode.Disposable {
               this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
               this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
               await this.updateView(this.vimState, { drawSelection: false, revealRange: false });
+              return;
             } else if (!selection.active.isEqual(selection.anchor)) {
               console.log('Creating Visual Selection!');
               this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
               this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
               await this.setCurrentMode(Mode.Visual);
               await this.updateView(this.vimState, { drawSelection: false, revealRange: false });
+              return;
             }
           }
-          return;
+          // return;
         }
         // Here we are on the selection changed of kind 'Keyboard' or 'undefined' which is triggered
         // when pressing movement keys that are not caught on the 'type' override but also when using
@@ -882,6 +884,9 @@ export class ModeHandler implements vscode.Disposable {
         end: this.vimState.cursorStopPosition,
       };
     }
+
+    // try to force pending selections to enqueue
+    const _ = vimState.editor.selections;
 
     vimState.selectionsChanged.ignoreIntermediateSelections = false;
     return vimState;
@@ -1536,14 +1541,17 @@ export class ModeHandler implements vscode.Disposable {
         vimState.selectionsChanged.enqueuedSelections +
         vimState.selectionsChanged.selectionsToIgnore;
 
-      vimState.selectionsChanged.ourSelections.push(
-        selections.reduce(
-          (hash, s) =>
-            hash +
-            `[${s.anchor.line}, ${s.anchor.character}; ${s.active.line}, ${s.active.character}]`,
-          ''
-        )
-      );
+      if (willTriggerChange) {
+        vimState.selectionsChanged.ourSelections.push(
+          selections.reduce(
+            (hash, s) =>
+              hash +
+              `[${s.anchor.line}, ${s.anchor.character}; ${s.active.line}, ${s.active.character}]`,
+            ''
+          )
+        );
+      }
+
       console.log(
         `Adding Selection Change to be Ignored! Ignore Count: ${
           vimState.selectionsChanged.selectionsToIgnore
