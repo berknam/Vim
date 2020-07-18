@@ -280,6 +280,17 @@ export async function activate(
         console.log('ignoring intermediate selection change');
         return;
       }
+      const selectionsHash = e.selections.reduce(
+        (hash, s) =>
+          hash +
+          `[${s.anchor.line}, ${s.anchor.character}; ${s.active.line}, ${s.active.character}]`,
+        ''
+      );
+      const idx = mh.vimState.selectionsChanged.ourSelections.indexOf(selectionsHash);
+      if (idx > -1) {
+        mh.vimState.selectionsChanged.ourSelections.splice(idx, 1);
+        return;
+      }
       console.log('increasing enqueued selections');
       mh.vimState.selectionsChanged.enqueuedSelections += 1;
       if (
@@ -293,8 +304,8 @@ export async function activate(
         // then we probably wanted that one to be ignored as well.
         mh.vimState.selectionsChanged.totalSelectionsToIgnore =
           mh.vimState.selectionsChanged.enqueuedSelections;
-        mh.vimState.selectionsChanged.selectionsToIgnore =
-          mh.vimState.selectionsChanged.enqueuedSelections;
+        // mh.vimState.selectionsChanged.selectionsToIgnore =
+        //   mh.vimState.selectionsChanged.enqueuedSelections;
       }
 
       // We may receive changes from other panels when, having selections in them containing the same file

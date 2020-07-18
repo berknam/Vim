@@ -229,6 +229,7 @@ export class VimState implements vscode.Disposable {
     selectionsToIgnore: 0,
     totalSelectionsToIgnore: 0,
     ignoreIntermediateSelections: false,
+    ourSelections: Array<string>(),
   };
 
   /**

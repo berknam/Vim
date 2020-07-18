@@ -161,7 +161,7 @@ export class ModeHandler implements vscode.Disposable {
           selection.anchor
         ).toString()}, ${Position.FromVSCodePosition(selection.active)}`
       );
-      return;
+      // return;
     }
     console.log(
       `Handling Selections Change! Selections: ${Position.FromVSCodePosition(
@@ -1536,6 +1536,14 @@ export class ModeHandler implements vscode.Disposable {
         vimState.selectionsChanged.enqueuedSelections +
         vimState.selectionsChanged.selectionsToIgnore;
 
+      vimState.selectionsChanged.ourSelections.push(
+        selections.reduce(
+          (hash, s) =>
+            hash +
+            `[${s.anchor.line}, ${s.anchor.character}; ${s.active.line}, ${s.active.character}]`,
+          ''
+        )
+      );
       console.log(
         `Adding Selection Change to be Ignored! Ignore Count: ${
           vimState.selectionsChanged.selectionsToIgnore

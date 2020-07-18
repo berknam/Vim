@@ -1495,7 +1495,7 @@ suite('Mode Visual', () => {
         `  },`,
         `]`,
       ],
-      keysPressed: ' af',
+      keysPressed: ' aflh',
       end: [
         `"vim.normalModeKeyBindingsNonRecursive": [`,
         `  {`,
