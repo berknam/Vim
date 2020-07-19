@@ -277,7 +277,7 @@ export async function activate(
       const mh = await getAndUpdateModeHandler();
 
       if (mh.vimState.selectionsChanged.ignoreIntermediateSelections) {
-        console.log('ignoring intermediate selection change');
+        logger.debug('Selections: ignoring intermediate selection change');
         return;
       }
       const selectionsHash = e.selections.reduce(
@@ -288,97 +288,37 @@ export async function activate(
       );
       const idx = mh.vimState.selectionsChanged.ourSelections.indexOf(selectionsHash);
       if (idx > -1) {
-        console.log(
-          `Ignoring selection: ${selectionsHash}, Count left: ${
+        logger.debug(
+          `Selections: Ignoring selection: ${selectionsHash}, Count left: ${
             mh.vimState.selectionsChanged.ourSelections.length - 1
           }`
         );
         mh.vimState.selectionsChanged.ourSelections.splice(idx, 1);
         return;
       } else if (mh.vimState.selectionsChanged.ourSelections.length > 0) {
-        console.log('SHOULD HAVE IGNORED THIS ONE TOO!');
-        return;
-      }
-      console.log('increasing enqueued selections');
-      mh.vimState.selectionsChanged.enqueuedSelections += 1;
-      if (
-        mh.vimState.selectionsChanged.selectionsToIgnore >= 1 &&
-        mh.vimState.selectionsChanged.enqueuedSelections >
-          mh.vimState.selectionsChanged.selectionsToIgnore
-      ) {
         // Some intermediate selection must have slipped in after setting the
-        // 'ignoreIntermediateSelections' to false and the 'updateView'. Which means
-        // we didn't count for it yet, but since we have selections to be ignored
-        // then we probably wanted that one to be ignored as well.
-        mh.vimState.selectionsChanged.totalSelectionsToIgnore =
-          mh.vimState.selectionsChanged.enqueuedSelections;
-        // mh.vimState.selectionsChanged.selectionsToIgnore =
-        //   mh.vimState.selectionsChanged.enqueuedSelections;
+        // 'ignoreIntermediateSelections' to false. Which means we didn't count
+        // for it yet, but since we have selections to be ignored then we probably
+        // wanted this one to be ignored as well.
+        logger.debug(`Selections: Ignoring slipped selection: ${selectionsHash}`);
+        return;
       }
 
       // We may receive changes from other panels when, having selections in them containing the same file
       // and changing text before the selection in current panel.
       if (e.textEditor !== mh.vimState.editor) {
-        mh.vimState.selectionsChanged.selectionsToIgnore = Math.max(
-          mh.vimState.selectionsChanged.selectionsToIgnore - 1,
-          0
-        );
-        mh.vimState.selectionsChanged.totalSelectionsToIgnore = Math.max(
-          mh.vimState.selectionsChanged.totalSelectionsToIgnore - 1,
-          0
-        );
-        mh.vimState.selectionsChanged.enqueuedSelections = Math.max(
-          mh.vimState.selectionsChanged.enqueuedSelections - 1,
-          0
-        );
         return;
       }
 
       if (mh.vimState.focusChanged) {
         mh.vimState.focusChanged = false;
-        mh.vimState.selectionsChanged.selectionsToIgnore = Math.max(
-          mh.vimState.selectionsChanged.selectionsToIgnore - 1,
-          0
-        );
-        mh.vimState.selectionsChanged.totalSelectionsToIgnore = Math.max(
-          mh.vimState.selectionsChanged.totalSelectionsToIgnore - 1,
-          0
-        );
-        mh.vimState.selectionsChanged.enqueuedSelections = Math.max(
-          mh.vimState.selectionsChanged.enqueuedSelections - 1,
-          0
-        );
         return;
       }
 
       if (mh.currentMode === Mode.EasyMotionMode) {
-        mh.vimState.selectionsChanged.selectionsToIgnore = Math.max(
-          mh.vimState.selectionsChanged.selectionsToIgnore - 1,
-          0
-        );
-        mh.vimState.selectionsChanged.totalSelectionsToIgnore = Math.max(
-          mh.vimState.selectionsChanged.totalSelectionsToIgnore - 1,
-          0
-        );
-        mh.vimState.selectionsChanged.enqueuedSelections = Math.max(
-          mh.vimState.selectionsChanged.enqueuedSelections - 1,
-          0
-        );
         return;
       }
 
-      // mh.vimState.selectionsChanged.enqueuedSelections += 1;
-      // if (
-      //   mh.vimState.selectionsChanged.selectionsToIgnore >= 1 &&
-      //   mh.vimState.selectionsChanged.enqueuedSelections >
-      //     mh.vimState.selectionsChanged.totalSelectionsToIgnore
-      // ) {
-      //   mh.vimState.selectionsChanged.totalSelectionsToIgnore =
-      //     mh.vimState.selectionsChanged.enqueuedSelections;
-      //   mh.vimState.selectionsChanged.selectionsToIgnore =
-      //     mh.vimState.selectionsChanged.enqueuedSelections;
-      // }
-      console.log('enqueueing selection');
       taskQueue.enqueueTask(
         () => mh.handleSelectionChange(e),
         undefined,
@@ -594,34 +534,9 @@ function registerEventListener<T>(
       return;
     }
 
-    /*
-    if (instanceOfSelectionChangeEvent(e)) {
-      if (globalState.selectionsChanged.ignoreIntermediateSelections) {
-        console.log('ignoring intermediate selection change');
-        return;
-      }
-      console.log('increasing enqueued selections');
-      globalState.selectionsChanged.enqueuedSelections += 1;
-      if (
-        globalState.selectionsChanged.selectionsToIgnore >= 1 &&
-        globalState.selectionsChanged.enqueuedSelections >
-          globalState.selectionsChanged.totalSelectionsToIgnore
-      ) {
-        globalState.selectionsChanged.totalSelectionsToIgnore =
-          globalState.selectionsChanged.enqueuedSelections;
-        globalState.selectionsChanged.selectionsToIgnore =
-          globalState.selectionsChanged.enqueuedSelections;
-      }
-    }
-    */
-
     listener(e);
   });
   context.subscriptions.push(disposable);
-}
-
-function instanceOfSelectionChangeEvent(e): e is vscode.TextEditorSelectionChangeEvent {
-  return e && 'selections' in e && 'kind' in e && 'textEditor' in e;
 }
 
 async function handleKeyEvent(key: string): Promise<void> {

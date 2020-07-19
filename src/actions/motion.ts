@@ -53,8 +53,6 @@ abstract class MoveByScreenLine extends BaseMovement {
     vimState: VimState,
     count: number
   ): Promise<Position | IMovement> {
-    console.log('CursorMove');
-    // vimState.ignoreSelectionChange += 1;
     await vscode.commands.executeCommand('cursorMove', {
       to: this.movementType,
       select: vimState.currentMode !== Mode.Normal,
@@ -85,7 +83,6 @@ abstract class MoveByScreenLine extends BaseMovement {
   }
 
   public async execActionForOperator(position: Position, vimState: VimState): Promise<IMovement> {
-    // vimState.ignoreSelectionChange += 1;
     await vscode.commands.executeCommand('cursorMove', {
       to: this.movementType,
       select: true,
@@ -131,7 +128,6 @@ abstract class MoveByScreenLineMaintainDesiredColumn extends MoveByScreenLine {
         (this.movementType === 'down' && position.line > start.line) ||
         (this.movementType === 'up' && position.line < prevLine)
       ) {
-        // vimState.ignoreSelectionChange += 1;
         await vscode.commands.executeCommand('cursorMove', {
           to: 'left',
           select: true,
@@ -141,7 +137,6 @@ abstract class MoveByScreenLineMaintainDesiredColumn extends MoveByScreenLine {
       }
     }
 
-    // vimState.ignoreSelectionChange += 1;
     await vscode.commands.executeCommand('cursorMove', {
       to: this.movementType,
       select: vimState.currentMode !== Mode.Normal,

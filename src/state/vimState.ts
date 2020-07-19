@@ -209,26 +209,23 @@ export class VimState implements vscode.Disposable {
    */
   public lastClickWasPastEol: boolean = false;
 
-  // public ignoreSelectionChange: number = 0;
-  // public selectionsChanged = {
-  //   enqueuedSelections: 0,
-  //   selectionsToIgnore: 0,
-  //   totalSelectionsToIgnore: 0,
-  // };
   /**
    * Used internally to ignore selection changes that were performed by us.
-   * 'enqueuedSelections': number of selections waiting to be handled
-   * 'selectionsToIgnore': number of selections set on 'updateView' by us to ignore
-   * 'totalSelectionsToIgnore': when setting the previous number on 'updateView' if there
-   * are any selections on the queue we set this number to the sum of selections in the queue
-   * at that moment with the selections to ignore. (so that we ignore any selection that was
-   * queued by middle steps in our set of actions.)
+   * 'ignoreIntermediateSelections': set to true when running an action, during this time
+   * all selections change events will be ignored.
+   * 'ourSelections': keeps track of our selections that will trigger a selection change event
+   * so that we can ignore them.
    */
   public selectionsChanged = {
-    enqueuedSelections: 0,
-    selectionsToIgnore: 0,
-    totalSelectionsToIgnore: 0,
+    /**
+     * Set to true when running an action, during this time
+     * all selections change events will be ignored.
+     */
     ignoreIntermediateSelections: false,
+    /**
+     * keeps track of our selections that will trigger a selection change event
+     * so that we can ignore them.
+     */
     ourSelections: Array<string>(),
   };
 

@@ -2445,7 +2445,6 @@ async function selectLastSearchWord(
   vimState.cursorStopPosition = result.end.getLeftThroughLineBreaks(); // end is exclusive
 
   // Move the cursor, this is a bit hacky...
-  // vimState.selectionsChanged.selectionsToIgnore++;
   vscode.window.activeTextEditor!.selection = new vscode.Selection(
     vimState.cursorStartPosition,
     vimState.cursorStopPosition
