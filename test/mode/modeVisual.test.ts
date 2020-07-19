@@ -1580,5 +1580,43 @@ suite('Mode Visual', () => {
       ],
       endMode: Mode.Normal,
     });
+
+    newTest({
+      title: 'Command editor.action.smartSelect.grow enters visual mode on multicursors',
+      config: {
+        normalModeKeyBindings: [
+          {
+            before: ['<leader>', 'a', 'f'],
+            commands: ['editor.action.smartSelect.grow'],
+          },
+        ],
+        visualModeKeyBindings: [
+          {
+            before: ['<leader>', 'a', 'f'],
+            commands: ['editor.action.smartSelect.grow'],
+          },
+        ],
+        leader: ' ',
+      },
+      start: [
+        `"vim.normalModeKeyBindingsNonRecursive": [`,
+        `  {`,
+        `    "before": ["|j"],`,
+        `    "after": ["g", "j"],`,
+        `  },`,
+        `]`,
+      ],
+      // the initial 'vlgb<Esc>_ll' is just to create a multicursor on the words 'before' and 'after'
+      keysPressed: 'vlgb<Esc>_ll afd<Esc>',
+      end: [
+        `"vim.normalModeKeyBindingsNonRecursive": [`,
+        `  {`,
+        `    "|": ["j"],`,
+        `    "": ["g", "j"],`,
+        `  },`,
+        `]`,
+      ],
+      endMode: Mode.Normal,
+    });
   });
 });

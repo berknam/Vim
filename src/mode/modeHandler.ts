@@ -43,7 +43,6 @@ import { Notation } from '../configuration/notation';
 import { ModeHandlerMap } from './modeHandlerMap';
 import { EditorIdentity } from '../editorIdentity';
 import { BaseOperator } from '../actions/operator';
-import { Globals } from '../globals';
 
 /**
  * ModeHandler is the extension's backbone. It listens to events and updates the VimState.
@@ -136,6 +135,17 @@ export class ModeHandler implements vscode.Disposable {
    * cursor start position).
    */
   public async handleSelectionChange(e: vscode.TextEditorSelectionChangeEvent): Promise<void> {
+    if (
+      vscode.window.activeTextEditor === undefined ||
+      e.textEditor.document !== vscode.window.activeTextEditor.document
+    ) {
+      // we don't care if there is no active editor
+      // or user selection changed in a paneled window (e.g debug console/terminal)
+      // This check is made before enqueuing this selection change, but sometimes
+      // between the enqueueing and the actual calling of this function the editor
+      // might close or change to other document
+      return;
+    }
     let selection = e.selections[0];
     this._logger.debug(
       `Selections: Handling Selection Change! Selection: ${Position.FromVSCodePosition(

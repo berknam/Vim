@@ -276,10 +276,6 @@ export async function activate(
 
       const mh = await getAndUpdateModeHandler();
 
-      if (mh.vimState.selectionsChanged.ignoreIntermediateSelections) {
-        logger.debug('Selections: ignoring intermediate selection change');
-        return;
-      }
       const selectionsHash = e.selections.reduce(
         (hash, s) =>
           hash +
@@ -294,6 +290,9 @@ export async function activate(
           }`
         );
         mh.vimState.selectionsChanged.ourSelections.splice(idx, 1);
+        return;
+      } else if (mh.vimState.selectionsChanged.ignoreIntermediateSelections) {
+        logger.debug(`Selections: ignoring intermediate selection change: ${selectionsHash}`);
         return;
       } else if (mh.vimState.selectionsChanged.ourSelections.length > 0) {
         // Some intermediate selection must have slipped in after setting the
