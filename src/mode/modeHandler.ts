@@ -156,208 +156,211 @@ export class ModeHandler implements vscode.Disposable {
       }`
     );
 
-    if (
-      (e.selections.length !== this.vimState.cursors.length || this.vimState.isMultiCursor) &&
-      this.vimState.currentMode !== Mode.VisualBlock
-    ) {
-      let allowedModes = [Mode.Normal];
-      if (
-        this.vimState.isMultiCursor &&
-        !this.vimState.recordedState.actionsRun.some(
-          (a) => a instanceof DocumentContentChangeAction
-        )
-      ) {
-        allowedModes.push(...[Mode.Insert, Mode.Replace]);
-      }
-      // Number of selections changed, make sure we know about all of them still
-      this.vimState.cursors = e.textEditor.selections.map(
-        (sel) =>
-          new Range(
-            // Adjust the cursor positions because cursors & selections don't match exactly
-            sel.anchor.isAfter(sel.active)
-              ? Position.FromVSCodePosition(sel.anchor).getLeft()
-              : Position.FromVSCodePosition(sel.anchor),
-            Position.FromVSCodePosition(sel.active)
-          )
-      );
-      if (
-        e.textEditor.selections.some((s) => !s.anchor.isEqual(s.active)) &&
-        allowedModes.includes(this.vimState.currentMode)
-      ) {
-        // If we got a visual selection and we are on normal, insert or replace mode, enter visual mode.
-        // We shouldn't go to visual mode on any other mode, because the other visual modes are handled
-        // very differently than vscode so only our extension will create them. And the other modes
-        // like the plugin modes shouldn't be changed or else it might mess up the plugins actions.
-        await this.setCurrentMode(Mode.Visual);
-      }
-      return this.updateView();
-    }
+    this.vimState.selectionChangedEventKind = e.kind;
+    await this.handleKeyEvent(SpecialKeys.SyncCursors);
 
-    /**
-     * We only trigger our view updating process if it's a mouse selection.
-     * Otherwise we only update our internal cursor positions accordingly.
-     */
-    if (e.kind !== vscode.TextEditorSelectionChangeKind.Mouse) {
-      if (selection) {
-        if (e.kind === vscode.TextEditorSelectionChangeKind.Command) {
-          // This 'Command' kind is triggered when using a command like 'editor.action.smartSelect.grow'
-          // but it is also triggered when we set the 'editor.selections' on 'updateView'.
-          if (
-            [Mode.Normal, Mode.Visual, Mode.Insert, Mode.Replace].includes(
-              this.vimState.currentMode
-            )
-          ) {
-            // Since the selections weren't ignored then probably we got change of selection from
-            // a command, so we need to update our start and stop positions. This is where commands
-            // like 'editor.action.smartSelect.grow' are handled.
-            if (this.vimState.currentMode === Mode.Visual) {
-              this._logger.debug('Selections: Updating Visual Selection!');
-              this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
-              this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
-              await this.updateView({ drawSelection: false, revealRange: false });
-              return;
-            } else if (!selection.active.isEqual(selection.anchor)) {
-              this._logger.debug('Selections: Creating Visual Selection from command!');
-              this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
-              this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
-              await this.setCurrentMode(Mode.Visual);
-              await this.updateView({ drawSelection: false, revealRange: false });
-              return;
-            }
-          }
-        }
-        // Here we are on the selection changed of kind 'Keyboard' or 'undefined' which is triggered
-        // when pressing movement keys that are not caught on the 'type' override but also when using
-        // commands like 'cursorMove'.
+    // if (
+    //   (e.selections.length !== this.vimState.cursors.length || this.vimState.isMultiCursor) &&
+    //   this.vimState.currentMode !== Mode.VisualBlock
+    // ) {
+    //   let allowedModes = [Mode.Normal];
+    //   if (
+    //     this.vimState.isMultiCursor &&
+    //     !this.vimState.recordedState.actionsRun.some(
+    //       (a) => a instanceof DocumentContentChangeAction
+    //     )
+    //   ) {
+    //     allowedModes.push(...[Mode.Insert, Mode.Replace]);
+    //   }
+    //   // Number of selections changed, make sure we know about all of them still
+    //   this.vimState.cursors = e.textEditor.selections.map(
+    //     (sel) =>
+    //       new Range(
+    //         // Adjust the cursor positions because cursors & selections don't match exactly
+    //         sel.anchor.isAfter(sel.active)
+    //           ? Position.FromVSCodePosition(sel.anchor).getLeft()
+    //           : Position.FromVSCodePosition(sel.anchor),
+    //         Position.FromVSCodePosition(sel.active)
+    //       )
+    //   );
+    //   if (
+    //     e.textEditor.selections.some((s) => !s.anchor.isEqual(s.active)) &&
+    //     allowedModes.includes(this.vimState.currentMode)
+    //   ) {
+    //     // If we got a visual selection and we are on normal, insert or replace mode, enter visual mode.
+    //     // We shouldn't go to visual mode on any other mode, because the other visual modes are handled
+    //     // very differently than vscode so only our extension will create them. And the other modes
+    //     // like the plugin modes shouldn't be changed or else it might mess up the plugins actions.
+    //     await this.setCurrentMode(Mode.Visual);
+    //   }
+    //   return this.updateView();
+    // }
 
-        if (isVisualMode(this.vimState.currentMode)) {
-          /**
-           * In Visual Mode, our `cursorPosition` and `cursorStartPosition` can not reflect `active`,
-           * `start`, `end` and `anchor` information in a selection.
-           * See `Fake block cursor with text decoration` section of `updateView` method.
-           * Besides this, sometimes on visual modes our start position is not the same has vscode
-           * anchor because we need to move vscode anchor one to the right of our start when our start
-           * is after our stop in order to include the start character on vscodes selection.
-           */
-          return;
-        }
+    // /**
+    //  * We only trigger our view updating process if it's a mouse selection.
+    //  * Otherwise we only update our internal cursor positions accordingly.
+    //  */
+    // if (e.kind !== vscode.TextEditorSelectionChangeKind.Mouse) {
+    //   if (selection) {
+    //     if (e.kind === vscode.TextEditorSelectionChangeKind.Command) {
+    //       // This 'Command' kind is triggered when using a command like 'editor.action.smartSelect.grow'
+    //       // but it is also triggered when we set the 'editor.selections' on 'updateView'.
+    //       if (
+    //         [Mode.Normal, Mode.Visual, Mode.Insert, Mode.Replace].includes(
+    //           this.vimState.currentMode
+    //         )
+    //       ) {
+    //         // Since the selections weren't ignored then probably we got change of selection from
+    //         // a command, so we need to update our start and stop positions. This is where commands
+    //         // like 'editor.action.smartSelect.grow' are handled.
+    //         if (this.vimState.currentMode === Mode.Visual) {
+    //           this._logger.debug('Selections: Updating Visual Selection!');
+    //           this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
+    //           this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
+    //           await this.updateView({ drawSelection: false, revealRange: false });
+    //           return;
+    //         } else if (!selection.active.isEqual(selection.anchor)) {
+    //           this._logger.debug('Selections: Creating Visual Selection from command!');
+    //           this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
+    //           this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
+    //           await this.setCurrentMode(Mode.Visual);
+    //           await this.updateView({ drawSelection: false, revealRange: false });
+    //           return;
+    //         }
+    //       }
+    //     }
+    //     // Here we are on the selection changed of kind 'Keyboard' or 'undefined' which is triggered
+    //     // when pressing movement keys that are not caught on the 'type' override but also when using
+    //     // commands like 'cursorMove'.
 
-        const cursorEnd = laterOf(
-          this.vimState.cursorStartPosition,
-          this.vimState.cursorStopPosition
-        );
-        if (e.textEditor.document.validatePosition(cursorEnd).isBefore(cursorEnd)) {
-          // The document changed such that our cursor position is now out of bounds, possibly by
-          // another program. Let's just use VSCode's selection.
-          // TODO: if this is the case, but we're in visual mode, we never get here (because of branch above)
-        } else if (
-          this.vimState.cursorStopPosition.isEqual(this.vimState.cursorStartPosition) &&
-          this.vimState.cursorStopPosition.getRight().isLineEnd() &&
-          this.vimState.cursorStopPosition.getLineEnd().isEqual(selection.active)
-        ) {
-          // We get here when we use a 'cursorMove' command (that is considered a selection changed
-          // kind of 'Keyboard') that ends past the line break. But our cursors are already on last
-          // character which is what we want. Even though our cursors will be corrected again when
-          // checking if they are in bounds on 'runAction' there is no need to be changing them back
-          // and forth so we check for this situation here.
-          return;
-        }
+    //     if (isVisualMode(this.vimState.currentMode)) {
+    //       /**
+    //        * In Visual Mode, our `cursorPosition` and `cursorStartPosition` can not reflect `active`,
+    //        * `start`, `end` and `anchor` information in a selection.
+    //        * See `Fake block cursor with text decoration` section of `updateView` method.
+    //        * Besides this, sometimes on visual modes our start position is not the same has vscode
+    //        * anchor because we need to move vscode anchor one to the right of our start when our start
+    //        * is after our stop in order to include the start character on vscodes selection.
+    //        */
+    //       return;
+    //     }
 
-        // Here we allow other 'cursorMove' commands to update our cursors in case there is another
-        // extension making cursor changes that we need to catch.
-        //
-        // We still need to be careful with this because this here might be changing our cursors
-        // in ways we don't want to. So with future selection issues this is a good place to start
-        // looking.
-        this._logger.debug(
-          `Selections: Changing Cursors from selection handler... ${Position.FromVSCodePosition(
-            selection.anchor
-          ).toString()}, ${Position.FromVSCodePosition(selection.active)}`
-        );
-        this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
-        this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
-        await this.updateView({ drawSelection: false, revealRange: false });
-      }
-      return;
-    }
+    //     const cursorEnd = laterOf(
+    //       this.vimState.cursorStartPosition,
+    //       this.vimState.cursorStopPosition
+    //     );
+    //     if (e.textEditor.document.validatePosition(cursorEnd).isBefore(cursorEnd)) {
+    //       // The document changed such that our cursor position is now out of bounds, possibly by
+    //       // another program. Let's just use VSCode's selection.
+    //       // TODO: if this is the case, but we're in visual mode, we never get here (because of branch above)
+    //     } else if (
+    //       this.vimState.cursorStopPosition.isEqual(this.vimState.cursorStartPosition) &&
+    //       this.vimState.cursorStopPosition.getRight().isLineEnd() &&
+    //       this.vimState.cursorStopPosition.getLineEnd().isEqual(selection.active)
+    //     ) {
+    //       // We get here when we use a 'cursorMove' command (that is considered a selection changed
+    //       // kind of 'Keyboard') that ends past the line break. But our cursors are already on last
+    //       // character which is what we want. Even though our cursors will be corrected again when
+    //       // checking if they are in bounds on 'runAction' there is no need to be changing them back
+    //       // and forth so we check for this situation here.
+    //       return;
+    //     }
 
-    if (e.selections.length === 1) {
-      this.vimState.isMultiCursor = false;
-    }
+    //     // Here we allow other 'cursorMove' commands to update our cursors in case there is another
+    //     // extension making cursor changes that we need to catch.
+    //     //
+    //     // We still need to be careful with this because this here might be changing our cursors
+    //     // in ways we don't want to. So with future selection issues this is a good place to start
+    //     // looking.
+    //     this._logger.debug(
+    //       `Selections: Changing Cursors from selection handler... ${Position.FromVSCodePosition(
+    //         selection.anchor
+    //       ).toString()}, ${Position.FromVSCodePosition(selection.active)}`
+    //     );
+    //     this.vimState.cursorStopPosition = Position.FromVSCodePosition(selection.active);
+    //     this.vimState.cursorStartPosition = Position.FromVSCodePosition(selection.anchor);
+    //     await this.updateView({ drawSelection: false, revealRange: false });
+    //   }
+    //   return;
+    // }
 
-    if (isStatusBarMode(this.vimState.currentMode)) {
-      return;
-    }
+    // if (e.selections.length === 1) {
+    //   this.vimState.isMultiCursor = false;
+    // }
 
-    let toDraw = false;
+    // if (isStatusBarMode(this.vimState.currentMode)) {
+    //   return;
+    // }
 
-    if (selection) {
-      let newPosition = Position.FromVSCodePosition(selection.active);
+    // let toDraw = false;
 
-      // Only check on a click, not a full selection (to prevent clicking past EOL)
-      if (newPosition.character >= newPosition.getLineEnd().character && selection.isEmpty) {
-        if (this.vimState.currentMode !== Mode.Insert) {
-          this.vimState.lastClickWasPastEol = true;
+    // if (selection) {
+    //   let newPosition = Position.FromVSCodePosition(selection.active);
 
-          // This prevents you from mouse clicking past the EOL
-          newPosition = newPosition.withColumn(Math.max(newPosition.getLineEnd().character - 1, 0));
+    //   // Only check on a click, not a full selection (to prevent clicking past EOL)
+    //   if (newPosition.character >= newPosition.getLineEnd().character && selection.isEmpty) {
+    //     if (this.vimState.currentMode !== Mode.Insert) {
+    //       this.vimState.lastClickWasPastEol = true;
 
-          // Switch back to normal mode since it was a click not a selection
-          await this.setCurrentMode(Mode.Normal);
+    //       // This prevents you from mouse clicking past the EOL
+    //       newPosition = newPosition.withColumn(Math.max(newPosition.getLineEnd().character - 1, 0));
 
-          toDraw = true;
-        }
-      } else if (selection.isEmpty) {
-        this.vimState.lastClickWasPastEol = false;
-      }
+    //       // Switch back to normal mode since it was a click not a selection
+    //       await this.setCurrentMode(Mode.Normal);
 
-      this.vimState.cursorStopPosition = newPosition;
-      this.vimState.cursorStartPosition = newPosition;
-      this.vimState.desiredColumn = newPosition.character;
+    //       toDraw = true;
+    //     }
+    //   } else if (selection.isEmpty) {
+    //     this.vimState.lastClickWasPastEol = false;
+    //   }
 
-      // start visual mode?
-      if (
-        selection.anchor.line === selection.active.line &&
-        selection.anchor.character >= newPosition.getLineEnd().character - 1 &&
-        selection.active.character >= newPosition.getLineEnd().character - 1
-      ) {
-        // This prevents you from selecting EOL
-      } else if (!selection.anchor.isEqual(selection.active)) {
-        let selectionStart = new Position(selection.anchor.line, selection.anchor.character);
+    //   this.vimState.cursorStopPosition = newPosition;
+    //   this.vimState.cursorStartPosition = newPosition;
+    //   this.vimState.desiredColumn = newPosition.character;
 
-        if (selectionStart.character > selectionStart.getLineEnd().character) {
-          selectionStart = new Position(selectionStart.line, selectionStart.getLineEnd().character);
-        }
+    //   // start visual mode?
+    //   if (
+    //     selection.anchor.line === selection.active.line &&
+    //     selection.anchor.character >= newPosition.getLineEnd().character - 1 &&
+    //     selection.active.character >= newPosition.getLineEnd().character - 1
+    //   ) {
+    //     // This prevents you from selecting EOL
+    //   } else if (!selection.anchor.isEqual(selection.active)) {
+    //     let selectionStart = new Position(selection.anchor.line, selection.anchor.character);
 
-        this.vimState.cursorStartPosition = selectionStart;
+    //     if (selectionStart.character > selectionStart.getLineEnd().character) {
+    //       selectionStart = new Position(selectionStart.line, selectionStart.getLineEnd().character);
+    //     }
 
-        if (selectionStart.isAfter(newPosition)) {
-          this.vimState.cursorStartPosition = this.vimState.cursorStartPosition.getLeft();
-        }
+    //     this.vimState.cursorStartPosition = selectionStart;
 
-        // If we prevented from clicking past eol but it is part of this selection, include the last char
-        if (this.vimState.lastClickWasPastEol) {
-          const newStart = new Position(selection.anchor.line, selection.anchor.character + 1);
-          this.vimState.editor.selection = new vscode.Selection(newStart, selection.end);
-          this.vimState.cursorStartPosition = selectionStart;
-          this.vimState.lastClickWasPastEol = false;
-        }
+    //     if (selectionStart.isAfter(newPosition)) {
+    //       this.vimState.cursorStartPosition = this.vimState.cursorStartPosition.getLeft();
+    //     }
 
-        if (
-          configuration.mouseSelectionGoesIntoVisualMode &&
-          !isVisualMode(this.vimState.currentMode) &&
-          this.currentMode !== Mode.Insert
-        ) {
-          await this.setCurrentMode(Mode.Visual);
+    //     // If we prevented from clicking past eol but it is part of this selection, include the last char
+    //     if (this.vimState.lastClickWasPastEol) {
+    //       const newStart = new Position(selection.anchor.line, selection.anchor.character + 1);
+    //       this.vimState.editor.selection = new vscode.Selection(newStart, selection.end);
+    //       this.vimState.cursorStartPosition = selectionStart;
+    //       this.vimState.lastClickWasPastEol = false;
+    //     }
 
-          // double click mouse selection causes an extra character to be selected so take one less character
-        }
-      } else if (this.vimState.currentMode !== Mode.Insert) {
-        await this.setCurrentMode(Mode.Normal);
-      }
+    //     if (
+    //       configuration.mouseSelectionGoesIntoVisualMode &&
+    //       !isVisualMode(this.vimState.currentMode) &&
+    //       this.currentMode !== Mode.Insert
+    //     ) {
+    //       await this.setCurrentMode(Mode.Visual);
 
-      this.updateView({ drawSelection: toDraw, revealRange: false });
-    }
+    //       // double click mouse selection causes an extra character to be selected so take one less character
+    //     }
+    //   } else if (this.vimState.currentMode !== Mode.Insert) {
+    //     await this.setCurrentMode(Mode.Normal);
+    //   }
+
+    //   this.updateView({ drawSelection: toDraw, revealRange: false });
+    // }
   }
 
   async handleMultipleKeyEvents(keys: string[]): Promise<void> {

@@ -332,6 +332,12 @@ export class VimState implements vscode.Disposable {
   };
 
   /**
+   * When we get a selection changed event we need to store the kind of selection
+   * change here so that we can use it on the `SyncCursorsCommand`
+   */
+  public selectionChangedEventKind: vscode.TextEditorSelectionChangeKind | undefined = undefined;
+
+  /**
    * The mode Vim will be in once this action finishes.
    */
   private _currentMode: Mode = Mode.Normal;

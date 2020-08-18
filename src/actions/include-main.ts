@@ -7,3 +7,4 @@ import './textobject';
 import './commands/insert';
 import './commands/actions';
 import './commands/commandLine';
+import './commands/syncCursors';
