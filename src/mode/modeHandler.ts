@@ -160,6 +160,15 @@ export class ModeHandler implements vscode.Disposable {
       (e.selections.length !== this.vimState.cursors.length || this.vimState.isMultiCursor) &&
       this.vimState.currentMode !== Mode.VisualBlock
     ) {
+      let allowedModes = [Mode.Normal];
+      if (
+        this.vimState.isMultiCursor &&
+        !this.vimState.recordedState.actionsRun.some(
+          (a) => a instanceof DocumentContentChangeAction
+        )
+      ) {
+        allowedModes.push(...[Mode.Insert, Mode.Replace]);
+      }
       // Number of selections changed, make sure we know about all of them still
       this.vimState.cursors = e.textEditor.selections.map(
         (sel) =>
@@ -173,7 +182,7 @@ export class ModeHandler implements vscode.Disposable {
       );
       if (
         e.textEditor.selections.some((s) => !s.anchor.isEqual(s.active)) &&
-        [Mode.Normal, Mode.Insert, Mode.Replace].includes(this.vimState.currentMode)
+        allowedModes.includes(this.vimState.currentMode)
       ) {
         // If we got a visual selection and we are on normal, insert or replace mode, enter visual mode.
         // We shouldn't go to visual mode on any other mode, because the other visual modes are handled
