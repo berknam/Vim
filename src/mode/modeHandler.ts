@@ -43,6 +43,7 @@ import { EditorIdentity } from '../editorIdentity';
 import { SpecialKeys } from '../util/specialKeys';
 import { BaseOperator } from '../actions/operator';
 import { SearchByNCharCommand } from '../actions/plugins/easymotion/easymotion.cmd';
+import { SyncCursorsCommand } from '../actions/commands/syncCursors';
 
 /**
  * ModeHandler is the extension's backbone. It listens to events and updates the VimState.
@@ -653,7 +654,18 @@ export class ModeHandler implements vscode.Disposable {
     }
 
     // Update view
-    await this.updateView();
+    if (action instanceof SyncCursorsCommand) {
+      // If action was 'SyncCursorsCommand' don't change the selection since we were the ones
+      // changing our cursors to be the same as selections and in some cases (like snippets) if
+      // we draw the selection again we might remove the insert mode vscode selection.
+      // TODO: if we implement 'SelectMode' then we can enter this mode on those snippet situations
+      // and this check might not be needed.
+      // TODO: if we ever split up the updateView function then we might start calling just some parts
+      // of that function depending on the action that just ran.
+      await this.updateView({ drawSelection: false, revealRange: false });
+    } else {
+      await this.updateView();
+    }
 
     if (action.isJump) {
       globalState.jumpTracker.recordJump(
@@ -771,8 +783,11 @@ export class ModeHandler implements vscode.Disposable {
 
     ranRepeatableAction =
       (ranRepeatableAction && this.vimState.currentMode === Mode.Normal) ||
-      this.createUndoPointForBrackets();
-    ranAction = ranAction && this.vimState.currentMode === Mode.Normal;
+      this.createUndoPointForBrackets() ||
+      action instanceof SyncCursorsCommand;
+    ranAction =
+      ranAction &&
+      (this.vimState.currentMode === Mode.Normal || action instanceof SyncCursorsCommand);
 
     // Record down previous action and flush temporary state
     if (ranRepeatableAction) {

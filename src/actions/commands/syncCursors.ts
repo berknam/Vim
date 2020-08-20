@@ -10,7 +10,7 @@ import { configuration } from '../../configuration/configuration';
 import { Logger } from '../../util/logger';
 
 @RegisterAction
-class SyncCursorsCommand extends BaseCommand {
+export class SyncCursorsCommand extends BaseCommand {
   modes = [
     Mode.Normal,
     Mode.Insert,
@@ -36,10 +36,12 @@ class SyncCursorsCommand extends BaseCommand {
       (selections.length !== vimState.cursors.length || vimState.isMultiCursor) &&
       vimState.currentMode !== Mode.VisualBlock
     ) {
+      // let allowedModes = [Mode.Normal, Mode.Insert, Mode.Replace];
       let allowedModes = [Mode.Normal];
       if (
-        vimState.isMultiCursor &&
-        !vimState.recordedState.actionsRun.some((a) => a instanceof DocumentContentChangeAction)
+        // vimState.isMultiCursor &&
+        // !vimState.recordedState.actionsRun.some((a) => a instanceof DocumentContentChangeAction)
+        !this.isSnippetSelectionChange(selections, vimState)
       ) {
         allowedModes.push(...[Mode.Insert, Mode.Replace]);
       }
@@ -234,5 +236,11 @@ class SyncCursorsCommand extends BaseCommand {
 
       // this.updateView({ drawSelection: toDraw, revealRange: false });
     }
+  }
+
+  private isSnippetSelectionChange(selections: vscode.Selection[], vimState: VimState): boolean {
+    return selections.every((s) => {
+      return vimState.cursors.every((c) => !s.contains(new vscode.Range(c.start, c.stop)));
+    });
   }
 }
