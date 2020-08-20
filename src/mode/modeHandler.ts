@@ -600,6 +600,7 @@ export class ModeHandler implements vscode.Disposable {
 
     // Store action pressed keys for showCmd
     recordedState.actionsRunPressedKeys.push(...recordedState.actionKeys);
+    recordedState.actionKeys = [];
 
     let actionToRecord: BaseAction | undefined = action;
     if (recordedState.actionsRun.length === 0) {

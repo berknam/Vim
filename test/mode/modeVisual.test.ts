@@ -1592,7 +1592,7 @@ suite('Mode Visual', () => {
       endMode: Mode.Normal,
     });
 
-    newTest({
+    newTestOnly({
       title: 'Command editor.action.smartSelect.grow enters visual mode on single character',
       config: {
         normalModeKeyBindings: [
@@ -1629,7 +1629,7 @@ suite('Mode Visual', () => {
       endMode: Mode.Normal,
     });
 
-    newTest({
+    newTestOnly({
       title: 'Command editor.action.smartSelect.grow enters visual mode on multicursors',
       config: {
         normalModeKeyBindings: [
