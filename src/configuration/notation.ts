@@ -1,3 +1,4 @@
+import { SpecialKeys } from '../util/specialKeys';
 import { configuration } from './configuration';
 
 export class Notation {
@@ -49,10 +50,20 @@ export class Notation {
       return key;
     }
 
-    key = key.toLocaleLowerCase();
-
     if (!this.isSurroundedByAngleBrackets(key)) {
       key = `<${key}>`;
+    }
+
+    const cmdKey = /<CMD-([^>]+)>/i.exec(key);
+
+    if (cmdKey && cmdKey.length === 2 && cmdKey[1]) {
+      return `<CMD-${cmdKey[1]}>`;
+    }
+
+    key = key.toLocaleLowerCase();
+
+    if (key === SpecialKeys.TimeoutFinished.toLowerCase()) {
+      return SpecialKeys.TimeoutFinished;
     }
 
     if (key === '<leader>') {

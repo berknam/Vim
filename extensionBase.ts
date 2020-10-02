@@ -25,7 +25,7 @@ let lastClosedModeHandler: ModeHandler | null = null;
 
 interface ICodeKeybinding {
   after?: string[];
-  commands?: { command: string; args: any[] }[];
+  commands?: { command: string; args: any[] }[] | string[];
 }
 
 export async function getAndUpdateModeHandler(
@@ -411,10 +411,12 @@ export async function activate(context: vscode.ExtensionContext, handleLocal: bo
         return;
       }
 
-      if (!args) {
-        throw new Error(
-          "'args' is undefined. For this remap to work it needs to have 'args' with an '\"after\": string[]' and/or a '\"commands\": { command: string; args: any[] }[]'"
-        );
+      const wrongFormatErrorMessage =
+        "'vim.remap' Error: wrong 'args' structure. For this remap to work it needs to have 'args' with an '\"after\": string[]' and/or a '\"commands\": { command: string; args: any[] }[] | string[]'";
+
+      if (!args || (!args.after && !args.commands)) {
+        logger.error(wrongFormatErrorMessage);
+        return;
       }
 
       if (args.after) {
@@ -425,12 +427,27 @@ export async function activate(context: vscode.ExtensionContext, handleLocal: bo
 
       if (args.commands) {
         for (const command of args.commands) {
-          // Check if this is a vim command by looking for :
-          if (command.command.startsWith(':')) {
-            await commandLine.Run(command.command.slice(1, command.command.length), mh.vimState);
-            mh.updateView();
+          let commandString: string;
+          let commandArgs: string[];
+          if (typeof command === 'string') {
+            commandString = command;
+            commandArgs = [];
+          } else if (command.command) {
+            commandString = command.command;
+            commandArgs = command.args;
           } else {
-            vscode.commands.executeCommand(command.command, command.args);
+            logger.error(wrongFormatErrorMessage);
+            return;
+          }
+
+          // Check if this is a vim command by looking for :
+          if (commandString.startsWith(':')) {
+            await commandLine.Run(commandString.slice(1, commandString.length), mh.vimState);
+            mh.updateView();
+          } else if (commandArgs) {
+            vscode.commands.executeCommand(commandString, commandArgs);
+          } else {
+            vscode.commands.executeCommand(commandString);
           }
         }
       }

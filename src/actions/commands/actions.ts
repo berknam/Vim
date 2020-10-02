@@ -3513,3 +3513,37 @@ class ActionShowFileInfo extends BaseCommand {
     reportFileInfo(position, vimState);
   }
 }
+
+@RegisterAction
+export class ActionRunVSCCommand extends BaseCommand {
+  modes = [Mode.Normal, Mode.Insert, Mode.Replace, Mode.Visual, Mode.VisualBlock, Mode.VisualLine];
+  keys = ['<CMD-.*>']; // this is just so the RegisterAction doesn't ignore thi action
+  runsOnceForEveryCursor() {
+    return false;
+  }
+  runsOnceForEachCountPrefix = true;
+
+  public async exec(position: Position, vimState: VimState): Promise<void> {
+    const cmdKey = /<CMD-([^>]+)>/i.exec(this.keysPressed[this.keysPressed.length - 1]);
+    if (cmdKey && cmdKey.length === 2) {
+      const cmd = cmdKey[1];
+      await vscode.commands.executeCommand(cmd);
+    }
+  }
+
+  public doesActionApply(vimState: VimState, keysPressed: string[]): boolean {
+    if (
+      this.modes.includes(vimState.currentMode) &&
+      /<CMD-[^>]+>/i.test(keysPressed[keysPressed.length - 1])
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  public couldActionApply(vimState: VimState, keysPressed: string[]): boolean {
+    // If 'doesActionApply' fails to apply, then there is no way it could apply, since
+    // we are considering it as one key only
+    return false;
+  }
+}

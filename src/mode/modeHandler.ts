@@ -26,6 +26,7 @@ import {
   DocumentContentChangeAction,
   ActionOverrideCmdD,
   CommandNumber,
+  ActionRunVSCCommand,
 } from './../actions/commands/actions';
 import { isTextTransformation } from './../transformations/transformations';
 import { globalState } from '../state/globalState';
@@ -599,7 +600,8 @@ export class ModeHandler implements vscode.Disposable {
 
         if (
           action instanceof CommandInsertInInsertMode ||
-          action instanceof CommandInsertPreviousText
+          action instanceof CommandInsertPreviousText ||
+          action instanceof ActionRunVSCCommand
         ) {
           // delay the macro recording
           actionToRecord = undefined;
