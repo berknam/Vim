@@ -74,8 +74,8 @@ export async function getAndUpdateModeHandler(
 /**
  * Loads and validates the user's configuration
  */
-async function loadConfiguration() {
-  const validatorResults = await configuration.load();
+async function loadConfiguration(global = false) {
+  const validatorResults = await configuration.load(global);
 
   Logger.configChanged();
 
@@ -101,7 +101,7 @@ async function loadConfiguration() {
  */
 export async function activate(context: vscode.ExtensionContext, handleLocal: boolean = true) {
   // before we do anything else, we need to load the configuration
-  await loadConfiguration();
+  await loadConfiguration(true);
 
   const logger = Logger.get('Extension Startup');
   logger.debug('Start');
@@ -123,7 +123,7 @@ export async function activate(context: vscode.ExtensionContext, handleLocal: bo
     context,
     vscode.workspace.onDidChangeConfiguration,
     async () => {
-      await loadConfiguration();
+      await loadConfiguration(true);
     },
     false
   );
@@ -255,6 +255,11 @@ export async function activate(context: vscode.ExtensionContext, handleLocal: bo
       taskQueue.enqueueTask(async () => {
         const mh = await getAndUpdateModeHandler(true);
         if (mh) {
+          if (
+            mh.vimState.document.languageId !== lastClosedModeHandler?.vimState.document.languageId
+          ) {
+            await loadConfiguration();
+          }
           globalState.jumpTracker.handleFileJump(
             lastClosedModeHandler ? Jump.fromStateNow(lastClosedModeHandler.vimState) : null,
             Jump.fromStateNow(mh.vimState)

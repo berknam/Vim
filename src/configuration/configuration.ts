@@ -96,10 +96,10 @@ class Configuration implements IConfiguration {
     'underline-thin': vscode.TextEditorCursorStyle.UnderlineThin,
   };
 
-  public async load(): Promise<ValidatorResults> {
+  public async load(global = false): Promise<ValidatorResults> {
     let vimConfigs: any = Globals.isTesting
       ? Globals.mockConfiguration
-      : this.getConfiguration('vim');
+      : this.getConfiguration('vim', global);
 
     /* tslint:disable:forin */
     // Disable forin rule here as we make accessors enumerable.`
@@ -180,7 +180,10 @@ class Configuration implements IConfiguration {
     return validatorResults;
   }
 
-  getConfiguration(section: string = ''): vscode.WorkspaceConfiguration {
+  getConfiguration(section: string = '', global = false): vscode.WorkspaceConfiguration {
+    if (global) {
+      return vscode.workspace.getConfiguration(section, undefined);
+    }
     const document = vscode.window.activeTextEditor?.document;
     const resource = document ? { uri: document.uri, languageId: document.languageId } : undefined;
     return vscode.workspace.getConfiguration(section, resource);

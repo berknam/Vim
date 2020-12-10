@@ -409,19 +409,23 @@
         },
         "vim.normalModeKeyBindings": {
           "type": "array",
-          "markdownDescription": "Remapped keys in Normal mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details."
+          "markdownDescription": "Remapped keys in Normal mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details.",
+          "scope": "language-overridable"
         },
         "vim.normalModeKeyBindingsNonRecursive": {
           "type": "array",
-          "markdownDescription": "Non-recursive remapped keys in Normal mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details."
+          "markdownDescription": "Non-recursive remapped keys in Normal mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details.",
+          "scope": "language-overridable"
         },
         "vim.operatorPendingModeKeyBindings": {
           "type": "array",
-          "markdownDescription": "Remapped keys in OperatorPending mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details."
+          "markdownDescription": "Remapped keys in OperatorPending mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details.",
+          "scope": "language-overridable"
         },
         "vim.operatorPendingModeKeyBindingsNonRecursive": {
           "type": "array",
-          "markdownDescription": "Non-recursive remapped keys in OperatorPending mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details."
+          "markdownDescription": "Non-recursive remapped keys in OperatorPending mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details.",
+          "scope": "language-overridable"
         },
         "vim.useCtrlKeys": {
           "type": "boolean",
@@ -473,33 +477,40 @@
         },
         "vim.insertModeKeyBindings": {
           "type": "array",
-          "markdownDescription": "Remapped keys in Insert mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details."
+          "markdownDescription": "Remapped keys in Insert mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details.",
+          "scope": "language-overridable"
         },
         "vim.insertModeKeyBindingsNonRecursive": {
           "type": "array",
-          "markdownDescription": "Non-recursive keybinding overrides to use for Insert mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details."
+          "markdownDescription": "Non-recursive keybinding overrides to use for Insert mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details.",
+          "scope": "language-overridable"
         },
         "vim.visualModeKeyBindings": {
           "type": "array",
-          "markdownDescription": "Remapped keys in Visual mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details."
+          "markdownDescription": "Remapped keys in Visual mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details.",
+          "scope": "language-overridable"
         },
         "vim.visualModeKeyBindingsNonRecursive": {
           "type": "array",
-          "markdownDescription": "Non-recursive keybinding overrides to use for Visual mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details."
+          "markdownDescription": "Non-recursive keybinding overrides to use for Visual mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details.",
+          "scope": "language-overridable"
         },
         "vim.commandLineModeKeyBindings": {
           "type": "array",
-          "markdownDescription": "Remapped keys in command line mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details."
+          "markdownDescription": "Remapped keys in command line mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details.",
+          "scope": "language-overridable"
         },
         "vim.commandLineModeKeyBindingsNonRecursive": {
           "type": "array",
-          "markdownDescription": "Non-recursive keybinding overrides to use for command line mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details."
+          "markdownDescription": "Non-recursive keybinding overrides to use for command line mode. Allows mapping to Vim commands or VS Code actions. See [README](https://github.com/VSCodeVim/Vim/#key-remapping) for details.",
+          "scope": "language-overridable"
         },
         "vim.textwidth": {
           "type": "number",
           "markdownDescription": "Width to word-wrap to when using `gq`.",
           "default": 80,
-          "minimum": 1
+          "minimum": 1,
+          "scope": "language-overridable"
         },
         "vim.timeout": {
           "type": "number",
