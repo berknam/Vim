@@ -407,6 +407,42 @@ export async function activate(context: vscode.ExtensionContext, handleLocal: bo
     });
   });
 
+  class EmmetFix implements vscode.Disposable {
+    private disposable: vscode.Disposable;
+    constructor(callback) {
+      this.disposable = vscode.commands.registerCommand(
+        'editor.emmet.action.expandAbbreviation',
+        callback
+      );
+    }
+    dispose() {
+      this.disposable.dispose();
+    }
+  }
+
+  const emmetFixCallback = async (args) => {
+    taskQueue.enqueueTask(async () => {
+      const mh = await getAndUpdateModeHandler();
+      if (mh) {
+        mh.vimState.selectionsChanged.ignoreIntermediateSelections = true;
+        const idx = context.subscriptions.findIndex((s) => s instanceof EmmetFix);
+        if (idx > -1) {
+          context.subscriptions.splice(idx, 1);
+        }
+        emmetFixDisposable.dispose();
+        await vscode.commands.executeCommand('editor.emmet.action.expandAbbreviation');
+        mh.vimState.selectionsChanged.ignoreIntermediateSelections = false;
+        emmetFixDisposable = registerEmmetFix();
+      }
+    });
+  };
+  const registerEmmetFix = () => {
+    const disposable = new EmmetFix(emmetFixCallback);
+    context.subscriptions.push(disposable);
+    return disposable;
+  };
+  let emmetFixDisposable = registerEmmetFix();
+
   // Register extension commands
   registerCommand(context, 'vim.showQuickpickCmdLine', async () => {
     const mh = await getAndUpdateModeHandler();
